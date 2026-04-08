@@ -7,4 +7,9 @@ export const apiUrl = {
   syncProperties: "admin/properties/sync",
   updatePropertyStatus: "admin/properties",
   getPropertyById: "admin/properties",
+  getAllPricingMarkups: "admin/pricing-markups",
+  getPricingMarkupById: "admin/pricing-markups",
+  togglePricingMarkupStatus: "admin/pricing-markups",
+  deletePricingMarkup: "admin/pricing-markups",
+  setDefaultMarkup: "admin/pricing-markups/set-default",
 };

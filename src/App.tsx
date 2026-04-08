@@ -19,6 +19,10 @@ import MYProfile from "./pages/settings/profile";
 import EditProfile from "./pages/settings/profile/profile-edit";
 import ProtectedRoute from "./routes/protected-route";
 import PublicRoute from "./routes/public-route";
+import PricingMarkupListing from "./pages/pricing-markup";
+import AddPricingMarkup from "./pages/pricing-markup/add-pricing-markup";
+import ViewPricingMarkup from "./pages/pricing-markup/view-pricing-markup";
+import EditPricingMarkup from "./pages/pricing-markup/edit-pricing-markup";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -54,6 +58,10 @@ const App = () => (
               <Route path="/settings/profile/edit" element={<EditProfile />} />
               <Route path="/get-all-properties-listing" element={<PropertiesListing />} />
               <Route path="/get-all-properties-listing/:id" element={<PropertyDetail />} />
+              <Route path="/get-all-pricing-markup" element={<PricingMarkupListing />} />
+              <Route path="/get-all-pricing-markup/add" element={<AddPricingMarkup />} />
+              <Route path="/get-all-pricing-markup/:id" element={<ViewPricingMarkup />} />
+              <Route path="/get-all-pricing-markup/:id/edit" element={<EditPricingMarkup />} />
             </Route>
 
             {/* Catch-all route */}

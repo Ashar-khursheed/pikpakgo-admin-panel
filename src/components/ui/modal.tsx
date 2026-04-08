@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 // Modal Component - Reusable
 interface ModalProps {
@@ -11,6 +11,7 @@ interface ModalProps {
   zIndex?: boolean;
   showFooter?: boolean;
   onConfirm?: () => void;
+  loading?: boolean;
 }
 
 export const Modal = ({
@@ -22,31 +23,26 @@ export const Modal = ({
   footerBtnText = 'Confirm',
   zIndex = false,
   showFooter = true,
-  onConfirm = () => { }
+  onConfirm = () => { },
+  loading = false,
 }: ModalProps) => {
   // Background scroll lock
   useEffect(() => {
     if (isOpen) {
-      // Modal open hone pe body scroll lock karo
       document.body.style.overflow = 'hidden';
     } else {
-      // Modal close hone pe scroll restore karo
       document.body.style.overflow = 'unset';
     }
-
-    // Cleanup function - component unmount pe
     return () => {
       document.body.style.overflow = 'unset';
     };
   }, [isOpen]);
 
-  // if (!isOpen) return null;
   if (!isOpen) return null;
 
   return (
     <div
-      className={`fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center p-4  animate-fadeIn backdrop-blur-sm ${zIndex === true ? 'z-[9999]' : 'z-50'}`}
-    // onClick={onClose}
+      className={`fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center p-4 animate-fadeIn backdrop-blur-sm ${zIndex === true ? 'z-[9999]' : 'z-50'}`}
     >
       <div
         className={`bg-white rounded-md shadow-2xl ${width} w-full animate-slideUp`}
@@ -59,7 +55,8 @@ export const Modal = ({
           </h2>
           <button
             onClick={onClose}
-            className="text-black  transition-colors duration-200"
+            disabled={loading}
+            className="text-black transition-colors duration-200 disabled:opacity-40"
           >
             <svg
               className="w-6 h-6"
@@ -77,8 +74,8 @@ export const Modal = ({
           </button>
         </div>
 
-        {/* Modal Body - Children */}
-        <div className={`p-6 `}>
+        {/* Modal Body */}
+        <div className="p-6">
           {children}
         </div>
 
@@ -87,17 +84,22 @@ export const Modal = ({
           <div className="flex gap-3 p-6 border-t border-gray-200">
             <button
               onClick={onClose}
-              className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200"
+              disabled={loading}
+              className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-300 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
-              onClick={() => {
-                if (onConfirm) onConfirm();
-                onClose();
-              }}
-              className="flex-1 bg-[#186737] text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+              onClick={() => { if (onConfirm) onConfirm(); }}
+              disabled={loading}
+              className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:shadow-lg transform hover:scale-105 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
             >
+              {loading && (
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+              )}
               {footerBtnText || 'Confirm'}
             </button>
           </div>
@@ -107,32 +109,15 @@ export const Modal = ({
       {/* Custom Animations */}
       <style>{`
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-
         @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-
-        .animate-fadeIn {
-          animation: fadeIn 0.2s ease-out;
-        }
-
-        .animate-slideUp {
-          animation: slideUp 0.3s ease-out;
-        }
+        .animate-fadeIn { animation: fadeIn 0.2s ease-out; }
+        .animate-slideUp { animation: slideUp 0.3s ease-out; }
       `}</style>
     </div>
   );
