@@ -352,7 +352,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
 // Create Axios instance
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "https://pickpackgo.in-sourceit.com/api/",
+  baseURL: import.meta.env.VITE_API_URL ,
   headers: {
     "Content-Type": "application/json",
     "Accept": "application/json",
@@ -474,7 +474,7 @@ interface ApiRequestOptions {
   headers?: Record<string, string>;
 }
 
-const makeApiRequest = async <T = any>(url: string, options: ApiRequestOptions = {}): Promise<T> => {
+const makeApiRequest = async <T = unknown>(url: string, options: ApiRequestOptions = {}): Promise<T> => {
   const { method = "GET", data = null, headers: customHeaders = {} } = options;
 
   // Check if data is FormData
