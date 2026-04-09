@@ -12,4 +12,9 @@ export const apiUrl = {
   togglePricingMarkupStatus: "admin/pricing-markups",
   deletePricingMarkup: "admin/pricing-markups",
   setDefaultMarkup: "admin/pricing-markups/set-default",
+  getAllUsers: "admin/users",
+  getUserById: "admin/users",
+  updateUser: "admin/users",
+  deleteUser: "admin/users",
+  toggleUserStatus: "admin/users",
 };

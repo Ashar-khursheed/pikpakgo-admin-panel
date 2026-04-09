@@ -36,6 +36,10 @@ const navigation: NavItem[] = [
     name: "Pricing Markup", href: "/get-all-pricing-markup",
     icon: LayoutDashboard, section: "Overview"
   },
+  {
+    name: "Users", href: "/get-all-users",
+    icon: LayoutDashboard, section: "Overview"
+  },
 
 ];
 
