@@ -40,6 +40,10 @@ const navigation: NavItem[] = [
     name: "Users", href: "/get-all-users",
     icon: LayoutDashboard, section: "Overview"
   },
+  {
+    name: "Content CMS", href: "/content-cms",
+    icon: FileText, section: "Overview"
+  },
 
 ];
 

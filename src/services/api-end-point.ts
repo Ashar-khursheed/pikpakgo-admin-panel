@@ -17,4 +17,8 @@ export const apiUrl = {
   updateUser: "admin/users",
   deleteUser: "admin/users",
   toggleUserStatus: "admin/users",
+  getAllContent: "admin/content",
+  getContentById: "admin/content",
+  toggleContentStatus: "admin/content",
+  deleteContent: "admin/content",
 };

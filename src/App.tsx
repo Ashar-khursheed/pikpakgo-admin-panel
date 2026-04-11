@@ -25,6 +25,9 @@ import ViewPricingMarkup from "./pages/pricing-markup/view-pricing-markup";
 import EditPricingMarkup from "./pages/pricing-markup/edit-pricing-markup";
 import GetAllUsers from "./pages/users";
 import UserDetail from "./pages/users/get-user-by-id";
+import ContentCmsListing from "./pages/content-cms";
+import AddContent from "./pages/content-cms/add-content";
+import ViewContent from "./pages/content-cms/view-content";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -66,6 +69,9 @@ const App = () => (
               <Route path="/get-all-pricing-markup/:id/edit" element={<EditPricingMarkup />} />
               <Route path="/get-all-users" element={<GetAllUsers />} />
               <Route path="/get-all-users/:id" element={<UserDetail />} />
+              <Route path="/content-cms" element={<ContentCmsListing />} />
+              <Route path="/content-cms/add" element={<AddContent />} />
+              <Route path="/content-cms/:id" element={<ViewContent />} />
             </Route>
 
             {/* Catch-all route */}
