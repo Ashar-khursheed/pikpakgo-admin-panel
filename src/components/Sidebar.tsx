@@ -216,7 +216,7 @@ export function Sidebar() {
             /> */}
 
               <div>
-                <p className="text-lg font-bold text-green-600">Pikpakgo</p>
+                <p className="text-lg font-bold text-green-600">PickPackgo</p>
               </div>
             </div>
             <button
