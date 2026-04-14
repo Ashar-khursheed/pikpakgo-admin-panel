@@ -28,6 +28,14 @@ import UserDetail from "./pages/users/get-user-by-id";
 import ContentCmsListing from "./pages/content-cms";
 import AddContent from "./pages/content-cms/add-content";
 import ViewContent from "./pages/content-cms/view-content";
+import EditContent from "./pages/content-cms/edit-content";
+import SeoManagementListing from "./pages/seo-management";
+import AddSeo from "./pages/seo-management/add-seo";
+import ViewSeo from "./pages/seo-management/view-seo";
+import ManageBlogCategory from "./pages/blog/manage-blog-category";
+import AddBlogCategory from "./pages/blog/manage-blog-category/add-blog-category";
+import ViewBlogCategory from "./pages/blog/manage-blog-category/view-blog-category";
+import EditBlogCategory from "./pages/blog/manage-blog-category/edit-blog-category";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -72,6 +80,14 @@ const App = () => (
               <Route path="/content-cms" element={<ContentCmsListing />} />
               <Route path="/content-cms/add" element={<AddContent />} />
               <Route path="/content-cms/:id" element={<ViewContent />} />
+              <Route path="/content-cms/:id/edit" element={<EditContent />} />
+              <Route path="/seo-management" element={<SeoManagementListing />} />
+              <Route path="/seo-management/add" element={<AddSeo />} />
+              <Route path="/seo-management/:id" element={<ViewSeo />} />
+              <Route path="/blog/manage-blog-category" element={<ManageBlogCategory />} />
+              <Route path="/blog/manage-blog-category/add" element={<AddBlogCategory />} />
+              <Route path="/blog/manage-blog-category/:id" element={<ViewBlogCategory />} />
+              <Route path="/blog/manage-blog-category/:id/edit" element={<EditBlogCategory />} />
             </Route>
 
             {/* Catch-all route */}

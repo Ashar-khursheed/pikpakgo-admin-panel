@@ -17,6 +17,7 @@ import {
   Image,
   Layers,
   Navigation,
+  Pencil,
   Search,
   ToggleRight,
 } from "lucide-react";
@@ -204,6 +205,14 @@ export default function ViewContent() {
           >
             {content.is_active ? "Active" : "Inactive"}
           </Badge>
+          <Button
+            size="sm"
+            onClick={() => navigate(`/content-cms/${content.id}/edit`)}
+            className="gap-1.5 ml-2"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit
+          </Button>
         </div>
       </div>
 

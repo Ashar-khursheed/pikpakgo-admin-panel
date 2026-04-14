@@ -28,7 +28,9 @@ import {
   Eye,
   FileText,
   MoreHorizontal,
+  Pencil,
   Plus,
+  RotateCcw,
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
@@ -51,6 +53,7 @@ interface ContentItem {
   published_at: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
 }
 
 interface PaginationMeta {
@@ -87,7 +90,9 @@ function capitalize(str: string) {
 // ─── Column definitions ────────────────────────────────────────────────────────
 const buildColumns = (
   onView: (id: number) => void,
+  onEdit: (id: number) => void,
   onDelete: (item: ContentItem) => void,
+  onRestore: (item: ContentItem) => void,
   onToggle: (item: ContentItem) => void,
 ): Column<ContentItem>[] => [
   {
@@ -138,27 +143,30 @@ const buildColumns = (
   },
   {
     header: "Status",
-    render: (c) => (
-      <Badge
-        className={
-          c.is_active
-            ? "bg-green-100 text-green-800 hover:bg-green-100"
-            : "bg-red-100 text-red-800 hover:bg-red-100"
-        }
-      >
-        {c.is_active ? "Active" : "Inactive"}
-      </Badge>
-    ),
+    render: (c) =>
+      c.deleted_at ? (
+        <Badge className="bg-gray-200 text-gray-600 hover:bg-gray-200">Deleted</Badge>
+      ) : (
+        <Badge
+          className={
+            c.is_active
+              ? "bg-green-100 text-green-800 hover:bg-green-100"
+              : "bg-red-100 text-red-800 hover:bg-red-100"
+          }
+        >
+          {c.is_active ? "Active" : "Inactive"}
+        </Badge>
+      ),
   },
-  {
-    header: "Active",
-    render: (c) => (
-      <Switch
-        checked={c.is_active}
-        onCheckedChange={() => onToggle(c)}
-      />
-    ),
-  },
+  // {
+  //   header: "Active",
+  //   render: (c) => (
+  //     <Switch
+  //       checked={c.is_active}
+  //       onCheckedChange={() => onToggle(c)}
+  //     />
+  //   ),
+  // },
   {
     header: "Published",
     render: (c) => (
@@ -191,13 +199,29 @@ const buildColumns = (
               <Eye className="h-4 w-4 text-muted-foreground" />
               View
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onDelete(c)}
-              className="gap-2 text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
+            {c.deleted_at ? (
+              <DropdownMenuItem
+                onClick={() => onRestore(c)}
+                className="gap-2 text-green-600 focus:text-green-600"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Restore
+              </DropdownMenuItem>
+            ) : (
+              <>
+                <DropdownMenuItem onClick={() => onEdit(c.id)} className="gap-2">
+                  <Pencil className="h-4 w-4 text-muted-foreground" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onDelete(c)}
+                  className="gap-2 text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -221,6 +245,7 @@ function ContentCmsListing() {
 
   // ── Modal state
   const [deleteItem, setDeleteItem] = useState<ContentItem | null>(null);
+  const [restoreItem, setRestoreItem] = useState<ContentItem | null>(null);
   const [toggleItem, setToggleItem] = useState<ContentItem | null>(null);
 
   const queryKey = [
@@ -265,6 +290,22 @@ function ContentCmsListing() {
     onError: () => {
       toast.error("Failed to update status");
       setToggleItem(null);
+    },
+  });
+
+  // ── Restore mutation
+  const { mutate: restoreContent, isPending: isRestoring } = useMutation({
+    mutationFn: () =>
+      makeApiRequest(`${apiUrl.restoreContent}/${restoreItem?.id}/restore`, {
+        method: "PUT",
+      }),
+    onSuccess: () => {
+      toast.success("Content restored successfully");
+      queryClient.invalidateQueries({ queryKey: ["content-cms"] });
+      setRestoreItem(null);
+    },
+    onError: () => {
+      toast.error("Failed to restore content");
     },
   });
 
@@ -336,6 +377,31 @@ function ContentCmsListing() {
               {toggleItem.is_active
                 ? "Deactivating this content will hide it from the frontend. You can re-activate it at any time."
                 : "Activating this content will make it visible on the frontend."}
+            </p>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Restore Modal ────────────────────────────────────────────────────── */}
+      <Modal
+        isOpen={restoreItem !== null}
+        onClose={() => setRestoreItem(null)}
+        title="Restore Content"
+        width="max-w-md"
+        footerBtnText="Yes, Restore"
+        loading={isRestoring}
+        onConfirm={() => restoreContent()}
+      >
+        {restoreItem && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-lg p-3 bg-green-50 border border-green-200">
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-green-500" />
+              <p className="text-sm font-medium text-green-800">
+                "{restoreItem.title}" will be restored
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This content was soft-deleted. Restoring it will make it available again.
             </p>
           </div>
         )}
@@ -468,7 +534,9 @@ function ContentCmsListing() {
             <DataTable
               columns={buildColumns(
                 (id) => navigate(`/content-cms/${id}`),
+                (id) => navigate(`/content-cms/${id}/edit`),
                 (item) => setDeleteItem(item),
+                (item) => setRestoreItem(item),
                 (item) => setToggleItem(item),
               )}
               data={contents}
