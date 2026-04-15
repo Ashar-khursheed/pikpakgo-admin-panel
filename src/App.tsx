@@ -15,6 +15,9 @@ import Products from "./pages/Products";
 import Settings from "./pages/Settings";
 import Authlogin from "./pages/auth";
 import ManageBlog from "./pages/blog/manage-blog";
+import AddBlogPost from "./pages/blog/manage-blog/add-blog-post";
+import ViewBlogPost from "./pages/blog/manage-blog/view-blog-post";
+import EditBlogPost from "./pages/blog/manage-blog/edit-blog-post";
 import ManageBlogCategory from "./pages/blog/manage-blog-category";
 import AddBlogCategory from "./pages/blog/manage-blog-category/add-blog-category";
 import EditBlogCategory from "./pages/blog/manage-blog-category/edit-blog-category";
@@ -109,6 +112,9 @@ const AppInner = () => {
                 <Route path="/blog/manage-blog-category/:id" element={<ViewBlogCategory />} />
                 <Route path="/blog/manage-blog-category/:id/edit" element={<EditBlogCategory />} />
                 <Route path="/blog/manage-blog" element={<ManageBlog />} />
+                <Route path="/blog/manage-blog/add" element={<AddBlogPost />} />
+                <Route path="/blog/manage-blog/:id" element={<ViewBlogPost />} />
+                <Route path="/blog/manage-blog/:id/edit" element={<EditBlogPost />} />
               </Route>
 
               {/* Catch-all route */}
