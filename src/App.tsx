@@ -49,10 +49,13 @@ const queryClient = new QueryClient();
 // Inner component — inside <Provider> so Redux hooks work correctly
 const AppInner = () => {
   const dispatch = useAppDispatch();
+  const token = localStorage.getItem("token");
 
   useEffect(() => {
-    dispatch(fetchUserProfile());
-  }, [dispatch]);
+    if (token) {
+      dispatch(fetchUserProfile());
+    }
+  }, [token, dispatch]);
 
   return (
     <QueryClientProvider client={queryClient}>
