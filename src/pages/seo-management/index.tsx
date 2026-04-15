@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -20,10 +21,11 @@ import { DataTable, Column } from "@/components/data-table";
 import makeApiRequest from "@/services/axios";
 import { formatDate } from "@/utils/utils";
 import { apiUrl } from "@/services/api-end-point";
-import { ChevronDown, Eye, Globe, MoreHorizontal, Plus, Search } from "lucide-react";
+import { ChevronDown, Eye, Globe, MoreHorizontal, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 interface SeoItem {
@@ -80,6 +82,8 @@ const groupConfig: Record<string, string> = {
 // ─── Column definitions ────────────────────────────────────────────────────────
 const buildColumns = (
   onView: (id: number) => void,
+  onEdit: (id: number) => void,
+  onDelete: (item: SeoItem) => void,
 ): Column<SeoItem>[] => [
   {
     header: "Route",
@@ -173,6 +177,18 @@ const buildColumns = (
               <Eye className="h-4 w-4 text-muted-foreground" />
               View
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onEdit(s.id)} className="gap-2">
+              <Pencil className="h-4 w-4 text-muted-foreground" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onDelete(s)}
+              className="gap-2 text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -183,6 +199,7 @@ const buildColumns = (
 // ─── Main Component ────────────────────────────────────────────────────────────
 function SeoManagementListing() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // ── Filters
   const [search, setSearch] = useState("");
@@ -190,6 +207,9 @@ function SeoManagementListing() {
   const [groupFilter, setGroupFilter] = useState("All");
   const [perPage, setPerPage] = useState("50");
   const [page, setPage] = useState(1);
+
+  // ── Delete modal
+  const [deleteTarget, setDeleteTarget] = useState<SeoItem | null>(null);
 
   const queryKey = [
     "seo-management",
@@ -216,6 +236,20 @@ function SeoManagementListing() {
     to:           data?.data?.to ?? 0,
     per_page:     data?.data?.per_page ?? 50,
   };
+
+  // ── Delete mutation
+  const { mutate: deleteSeo, isPending: isDeleting } = useMutation({
+    mutationFn: (id: number) =>
+      makeApiRequest(`${apiUrl.deleteSeo}/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      toast.success("SEO record deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["seo-management"] });
+      setDeleteTarget(null);
+    },
+    onError: () => {
+      toast.error("Failed to delete SEO record");
+    },
+  });
 
   const handleSearch = () => {
     setAppliedSearch(search);
@@ -308,7 +342,11 @@ function SeoManagementListing() {
 
         <CardContent>
           <DataTable
-            columns={buildColumns((id) => navigate(`/seo-management/${id}`))}
+            columns={buildColumns(
+              (id) => navigate(`/seo-management/${id}`),
+              (id) => navigate(`/seo-management/${id}/edit`),
+              (item) => setDeleteTarget(item),
+            )}
             data={seoItems}
             loading={isFetching}
             rowKey={(s) => s.id}
@@ -329,6 +367,50 @@ function SeoManagementListing() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Delete Modal ─────────────────────────────────────────────────────── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold">Delete SEO Record</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Are you sure you want to delete{" "}
+                  <span className="font-medium text-foreground">
+                    {deleteTarget.route_label}
+                  </span>
+                  ? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteSeo(deleteTarget.id)}
+                disabled={isDeleting}
+                className="min-w-24"
+              >
+                {isDeleting ? (
+                  <><span className="animate-spin mr-2">⏳</span> Deleting...</>
+                ) : (
+                  "Delete"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

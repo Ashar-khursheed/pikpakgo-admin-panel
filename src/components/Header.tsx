@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useAppSelector } from '@/store/hooks';
 
 // ── Page title from route ──
 function usePageTitle() {
@@ -41,6 +42,8 @@ function usePageTitle() {
 }
 
 export function Header() {
+    const { profile, loading, error } = useAppSelector((state) => state.userProfile);
+    console.log("User Profile in Sidebar:", profile);
   const { user }    = useAuth();
   const navigate    = useNavigate();
   const pageTitle   = usePageTitle();
@@ -86,8 +89,12 @@ export function Header() {
   ];
   const unreadCount = notifications.filter(n => n.unread).length;
 
-  const initials = (user?.full_name ?? 'Admin')
-    .split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
+  const initials = (profile?.first_name && profile?.last_name ? `${profile.first_name} ${profile.last_name}` : 'Admin')
+    .split(' ')
+    .map((w: string) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <>
@@ -298,9 +305,9 @@ export function Header() {
                     transition-all duration-200
                   ">
                     <img
-                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user?.full_name ?? 'Admin')}&background=00a63e&color=fff&bold=true&size=64`}
+                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.first_name ?? 'Admin')}&background=00a63e&color=fff&bold=true&size=64`}
                       className="w-full h-full object-cover"
-                      alt={user?.full_name ?? 'Admin'}
+                      alt={profile?.first_name ?? 'Admin'}
                     />
                   </div>
 
@@ -308,7 +315,8 @@ export function Header() {
                     hidden md:block text-sm font-semibold text-gray-700
                     group-hover:text-gray-900 transition-colors max-w-[120px] truncate
                   ">
-                    {user?.full_name ?? 'Admin'}
+                          {`${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "Admin User"}
+
                   </span>
 
                   <ChevronDown className="
@@ -330,13 +338,13 @@ export function Header() {
                       {initials}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-gray-900 truncate">{user?.full_name ?? 'Admin'}</p>
-                      <p className="text-[11px] text-gray-400 truncate">{user?.email ?? 'admin@locksee.app'}</p>
+                      <p className="text-sm font-bold text-gray-900 truncate">{`${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "Admin User"}</p>
+                      <p className="text-[11px] text-gray-400 truncate">{profile?.email ?? 'admin@locksee.app'}</p>
                     </div>
                   </div>
                   <div className="mt-2.5 flex items-center gap-1.5 bg-green-50 rounded-xl px-2.5 py-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                    <span className="text-[11px] font-bold text-green-700">Super Admin</span>
+                    <span className="text-[11px] capitalize font-bold text-green-700">{profile?.user_type}</span>
                     <Shield className="w-3 h-3 text-green-500 ml-auto" />
                   </div>
                 </div>

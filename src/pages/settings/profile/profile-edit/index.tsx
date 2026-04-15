@@ -37,6 +37,7 @@ interface UserProfile {
   country: string;
   city?: string;
   state?: string;
+  zip_code?: string;
   address?: string;
   date_of_birth?: string;
   gender?: string;
@@ -57,6 +58,7 @@ const profileSchema = z.object({
   country: z.string().min(1, "Required"),
   city: z.string().min(1, "Required"),
   state: z.string().min(1, "Required"),
+  zip_code: z.string().optional(),
   address: z.string().min(1, "Required"),
   date_of_birth: z.string().min(1, "Required"),
   gender: z.enum(["male", "female", "other"]),
@@ -140,6 +142,7 @@ export default function EditProfile() {
         country: profile.country || "",
         city: profile.city || "",
         state: profile.state || "",
+        zip_code: profile.zip_code || "",
         address: profile.address || "",
         date_of_birth: profile.date_of_birth || "",
         gender: (profile.gender as ProfileFormValues["gender"]) || "male",
@@ -272,7 +275,7 @@ export default function EditProfile() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <FieldGroup label="Country" icon={Globe} error={errors.country?.message}>
                 <Input placeholder="USA" {...register("country")} />
               </FieldGroup>
@@ -281,6 +284,9 @@ export default function EditProfile() {
               </FieldGroup>
               <FieldGroup label="City" icon={MapPin} error={errors.city?.message}>
                 <Input placeholder="Los Angeles" {...register("city")} />
+              </FieldGroup>
+              <FieldGroup label="Zip Code" icon={MapPin} error={errors.zip_code?.message}>
+                <Input placeholder="90001" {...register("zip_code")} />
               </FieldGroup>
             </div>
             <FieldGroup label="Address" icon={Home} error={errors.address?.message}>

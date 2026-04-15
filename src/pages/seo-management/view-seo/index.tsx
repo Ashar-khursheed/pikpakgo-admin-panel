@@ -14,6 +14,7 @@ import {
   Globe,
   Hash,
   Image,
+  Pencil,
   Search,
   Twitter,
 } from "lucide-react";
@@ -190,6 +191,14 @@ export default function ViewSeo() {
           >
             {seo.is_active ? "Active" : "Inactive"}
           </Badge>
+          <Button
+            size="sm"
+            onClick={() => navigate(`/seo-management/${seo.id}/edit`)}
+            className="gap-1.5 ml-2"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit
+          </Button>
         </div>
       </div>
 

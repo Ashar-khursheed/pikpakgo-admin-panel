@@ -1,48 +1,20 @@
 "use client";
-import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { useAuth } from "@/context/auth";
+import { useAppSelector } from "@/store/hooks";
 import {
-  LayoutDashboard,
-  MessageSquare,
-  Users,
-  Hash,
-  ShieldAlert,
-  Bell,
-  Settings2,
-  DollarSign,
-  BarChart3,
-  FolderOpen,
-  Phone,
-  Shield,
-  LogOut,
-  Search,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
   ChevronUp,
-  MessageCircle,
-  Key,
-  Zap,
-  Globe,
-  Landmark,
-  Tag,
-  Package,
-  TrendingUp,
-  UserCheck,
-  VolumeX,
-  Ban,
-  Activity,
-  GitBranch,
-  Layers,
-  Wrench,
-  LucideIcon,
-  Image,
   FileText,
-  Radio,
-  Megaphone,
+  LayoutDashboard,
+  LogOut,
+  LucideIcon,
+  Search,
+  ShieldAlert
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/context/auth";
+import { useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 
 // ─── Types ───
 interface SubMenuItem {
@@ -104,7 +76,7 @@ const navigation: NavItem[] = [
     badge: 14,
     subItems: [
       { name: "Manage Blog Categories", href: "/blog/manage-blog-category" },
-      { name: "Manage Blog Posts", href: "/dashboard/moderation/auto" },
+      { name: "Manage Blog Posts", href: "/blog/manage-blog" },
     ],
   },
 ];
@@ -162,6 +134,8 @@ function hoverOff(el: HTMLElement, bg: string, color: string, border?: string) {
 
 // ─── Main Sidebar ───
 export function Sidebar() {
+  const { profile, loading, error } = useAppSelector((state) => state.userProfile);
+  console.log("User Profile in Sidebar:", profile);
   const [collapsed, setCollapsed] = useState(false);
   const [openMenus, setOpenMenus] = useState<string[]>(["Chats", "Finance"]);
   const { user } = useAuth();
@@ -653,7 +627,7 @@ export function Sidebar() {
                 boxShadow: `0 2px 8px rgba(0,0,0,0.15)`,
               }}
             >
-              {(user?.full_name || "AD")
+              {(`${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "AD")
                 .split(" ")
                 .map((n: string) => n[0])
                 .join("")
@@ -679,7 +653,7 @@ export function Sidebar() {
                     textOverflow: "ellipsis",
                   }}
                 >
-                  {user?.full_name || "Admin User"}
+                  {`${profile?.first_name || ""} ${profile?.last_name || ""}`.trim() || "Admin User"}
                 </p>
                 <p
                   style={{
@@ -690,7 +664,7 @@ export function Sidebar() {
                     textOverflow: "ellipsis",
                   }}
                 >
-                  {user?.email || "admin@locksee.app"}
+                  {profile?.email || "admin@locksee.app"}
                 </p>
               </div>
               <button
