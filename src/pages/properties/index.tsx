@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -15,17 +16,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { CustomPagination } from "@/components/custom-pagination";
 import { DataTable, Column } from "@/components/data-table";
 import makeApiRequest from "@/services/axios";
 import { formatDate } from "@/utils/utils";
 import { apiUrl } from "@/services/api-end-point";
 import { Switch } from "@/components/ui/switch";
-import { Building2, ChevronDown, Eye, MapPin, RefreshCw } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  Eye,
+  MapPin,
+  MoreHorizontal,
+  Plus,
+  RefreshCw,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
+// ─── Types ─────────────────────────────────────────────────────────────────────
 interface Property {
   id: number;
   provider: string;
@@ -56,6 +75,18 @@ interface Property {
   };
 }
 
+interface PropertyFee {
+  id: number;
+  fee_type: string;
+  fee_name: string;
+  amount: number;
+  amount_type: string;
+  applies_to: string;
+  is_mandatory: boolean;
+  is_taxable: boolean;
+  is_active: boolean;
+}
+
 interface PaginationMeta {
   current_page: number;
   last_page: number;
@@ -78,6 +109,8 @@ const buildColumns = (
   onToggleStatus: (id: number, newStatus: boolean) => void,
   togglingId: number | null,
   onViewDetails: (id: number) => void,
+  onAddPricing: (id: number) => void,
+  onDeletePricing: (id: number) => void,
 ): Column<Property>[] => [
   {
     header: "Property",
@@ -153,6 +186,33 @@ const buildColumns = (
       ),
   },
   {
+    header: "Pricing Fee",
+    render: (p) => (
+      <div className="flex justify-start">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onAddPricing(p.id)} className="gap-2">
+              <Plus className="h-4 w-4 text-muted-foreground" />
+              Add
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onDeletePricing(p.id)}
+              className="gap-2 text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    ),
+  },
+  {
     header: "Active",
     render: (p) => (
       <Switch
@@ -177,17 +237,24 @@ const buildColumns = (
       <div className="flex justify-end">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <Eye className="h-4 w-4" />
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onViewDetails(p.id)} className="gap-2">
+              <Eye className="h-4 w-4 text-muted-foreground" />
+              View Details
+            </DropdownMenuItem>
             {p.api_data?.propertyUrl && (
-              <DropdownMenuItem onClick={() => window.open(p.api_data.propertyUrl, "_blank")}>
+              <DropdownMenuItem
+                onClick={() => window.open(p.api_data.propertyUrl, "_blank")}
+                className="gap-2"
+              >
+                <Eye className="h-4 w-4 text-muted-foreground" />
                 View on Provider
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => onViewDetails(p.id)}>View Details</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -208,6 +275,25 @@ function PropertiesListing() {
   const [page, setPage] = useState(1);
   const [togglingId, setTogglingId] = useState<number | null>(null);
 
+  // ─── Add Pricing Modal state ─────────────────────────────────────────────────
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
+  const [pricingPropertyId, setPricingPropertyId] = useState<number | null>(null);
+  const [pricingForm, setPricingForm] = useState({
+    fee_type: "cleaning_fee",
+    fee_name: "",
+    amount: "",
+    amount_type: "fixed",
+    applies_to: "per_stay",
+    is_mandatory: true,
+    is_taxable: false,
+    is_active: true,
+  });
+
+  // ─── Delete Pricing Modal state ──────────────────────────────────────────────
+  const [deleteFeesModalOpen, setDeleteFeesModalOpen] = useState(false);
+  const [deleteFeesPropertyId, setDeleteFeesPropertyId] = useState<number | null>(null);
+  const [deletingFeeId, setDeletingFeeId] = useState<number | null>(null);
+
   const queryKey = [
     "properties",
     { page, perPage, provider, statusFilter, search: appliedSearch },
@@ -223,7 +309,7 @@ function PropertiesListing() {
   });
 
   // ─── Fetch properties ────────────────────────────────────────────────────────
-  const { data, isFetching, refetch } = useQuery({
+  const { data, isFetching } = useQuery({
     queryKey,
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), per_page: perPage });
@@ -259,7 +345,6 @@ function PropertiesListing() {
       setTogglingId(id);
     },
     onSuccess: (_res, { id, newStatus }) => {
-      // Optimistically update cached list without a full refetch
       queryClient.setQueryData<PropertiesApiResponse>(queryKey, (old) => {
         if (!old) return old;
         return {
@@ -308,6 +393,87 @@ function PropertiesListing() {
 
   const handlePageChange = (newPage: number) => {
     setPage(newPage);
+  };
+
+  // ─── Add Pricing ─────────────────────────────────────────────────────────────
+  const { mutate: submitPricing, isPending: isSubmittingPricing } = useMutation({
+    mutationFn: (payload: typeof pricingForm & { amount: number }) =>
+      makeApiRequest(`${apiUrl.addPropertyFee}/${pricingPropertyId}/fees`, {
+        method: "POST",
+        data: payload,
+      }),
+    onSuccess: () => {
+      toast.success("Pricing fee added successfully");
+      setPricingModalOpen(false);
+      resetPricingForm();
+    },
+    onError: () => {
+      toast.error("Failed to add pricing fee");
+    },
+  });
+
+  const resetPricingForm = () => {
+    setPricingForm({
+      fee_type: "cleaning_fee",
+      fee_name: "",
+      amount: "",
+      amount_type: "fixed",
+      applies_to: "per_stay",
+      is_mandatory: true,
+      is_taxable: false,
+      is_active: true,
+    });
+  };
+
+  const handleOpenPricingModal = (id: number) => {
+    setPricingPropertyId(id);
+    resetPricingForm();
+    setPricingModalOpen(true);
+  };
+
+  const handlePricingSubmit = () => {
+    if (!pricingForm.fee_name.trim() || !pricingForm.amount) {
+      toast.error("Fee name and amount are required");
+      return;
+    }
+    submitPricing({ ...pricingForm, amount: Number(pricingForm.amount) });
+  };
+
+  // ─── Delete Pricing — fetch fees list ────────────────────────────────────────
+  const {
+    data: feesData,
+    isFetching: isFetchingFees,
+    refetch: refetchFees,
+  } = useQuery({
+    queryKey: ["property-fees", deleteFeesPropertyId],
+    queryFn: () =>
+      makeApiRequest<{ success: boolean; data: PropertyFee[] }>(
+        `${apiUrl.addPropertyFee}/${deleteFeesPropertyId}/fees`
+      ),
+    enabled: deleteFeesModalOpen && deleteFeesPropertyId != null,
+  });
+
+  const fees: PropertyFee[] = (feesData?.data as { fees?: PropertyFee[] })?.fees ?? [];
+
+  const { mutate: deleteFee } = useMutation({
+    mutationFn: (feeId: number) =>
+      makeApiRequest(`${apiUrl.addPropertyFee}/${deleteFeesPropertyId}/fees/${feeId}`, {
+        method: "DELETE",
+      }),
+    onMutate: (feeId) => setDeletingFeeId(feeId),
+    onSuccess: () => {
+      toast.success("Fee deleted successfully");
+      refetchFees();
+    },
+    onError: () => {
+      toast.error("Failed to delete fee");
+    },
+    onSettled: () => setDeletingFeeId(null),
+  });
+
+  const handleOpenDeleteFeesModal = (id: number) => {
+    setDeleteFeesPropertyId(id);
+    setDeleteFeesModalOpen(true);
   };
 
   return (
@@ -406,7 +572,13 @@ function PropertiesListing() {
 
         <CardContent>
           <DataTable
-            columns={buildColumns(handleToggleStatus, togglingId, handleViewDetails)}
+            columns={buildColumns(
+              handleToggleStatus,
+              togglingId,
+              handleViewDetails,
+              handleOpenPricingModal,
+              handleOpenDeleteFeesModal,
+            )}
             data={properties}
             loading={isFetching}
             rowKey={(p) => p.id}
@@ -427,6 +599,213 @@ function PropertiesListing() {
           )}
         </CardContent>
       </Card>
+
+      {/* ─── Add Pricing Modal ─────────────────────────────────────────────── */}
+      <Dialog
+        open={pricingModalOpen}
+        onOpenChange={(open) => {
+          if (!open) { setPricingModalOpen(false); resetPricingForm(); }
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Add Pricing Fee</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Fee Type</Label>
+              <Select
+                value={pricingForm.fee_type}
+                onValueChange={(val) => setPricingForm((f) => ({ ...f, fee_type: val }))}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cleaning_fee">Cleaning Fee</SelectItem>
+                  <SelectItem value="service_fee">Service Fee</SelectItem>
+                  <SelectItem value="pet_fee">Pet Fee</SelectItem>
+                  <SelectItem value="resort_fee">Resort Fee</SelectItem>
+                  <SelectItem value="parking_fee">Parking Fee</SelectItem>
+                  <SelectItem value="extra_guest_fee">Extra Guest Fee</SelectItem>
+                  <SelectItem value="security_deposit">Security Deposit</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Fee Name</Label>
+              <Input
+                className="col-span-3"
+                placeholder="e.g. Cleaning Fee"
+                value={pricingForm.fee_name}
+                onChange={(e) => setPricingForm((f) => ({ ...f, fee_name: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Amount</Label>
+              <Input
+                className="col-span-3"
+                type="number"
+                min={0}
+                placeholder="e.g. 75"
+                value={pricingForm.amount}
+                onChange={(e) => setPricingForm((f) => ({ ...f, amount: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Amount Type</Label>
+              <Select
+                value={pricingForm.amount_type}
+                onValueChange={(val) => setPricingForm((f) => ({ ...f, amount_type: val }))}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed">Fixed</SelectItem>
+                  <SelectItem value="percentage">Percentage</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Applies To</Label>
+              <Select
+                value={pricingForm.applies_to}
+                onValueChange={(val) => setPricingForm((f) => ({ ...f, applies_to: val }))}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="per_stay">Per Stay</SelectItem>
+                  <SelectItem value="per_night">Per Night</SelectItem>
+                  <SelectItem value="per_guest">Per Guest</SelectItem>
+                  <SelectItem value="per_guest_per_night">Per Guest Per Night</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Mandatory</Label>
+              <div className="col-span-3 flex items-center">
+                <Switch
+                  checked={pricingForm.is_mandatory}
+                  onCheckedChange={(val) => setPricingForm((f) => ({ ...f, is_mandatory: val }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Taxable</Label>
+              <div className="col-span-3 flex items-center">
+                <Switch
+                  checked={pricingForm.is_taxable}
+                  onCheckedChange={(val) => setPricingForm((f) => ({ ...f, is_taxable: val }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Active</Label>
+              <div className="col-span-3 flex items-center">
+                <Switch
+                  checked={pricingForm.is_active}
+                  onCheckedChange={(val) => setPricingForm((f) => ({ ...f, is_active: val }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setPricingModalOpen(false); resetPricingForm(); }}
+              disabled={isSubmittingPricing}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handlePricingSubmit} disabled={isSubmittingPricing}>
+              {isSubmittingPricing ? "Saving..." : "Save Fee"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Delete Pricing Fees Modal ─────────────────────────────────────── */}
+      <Dialog
+        open={deleteFeesModalOpen}
+        onOpenChange={(open) => {
+          if (!open) { setDeleteFeesModalOpen(false); setDeleteFeesPropertyId(null); }
+        }}
+      >
+        <DialogContent className="sm:max-w-[540px]">
+          <DialogHeader>
+            <DialogTitle>Delete Pricing Fee</DialogTitle>
+          </DialogHeader>
+
+          <div className="py-2">
+            {isFetchingFees ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Loading fees...</p>
+            ) : fees.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                No pricing fees found for this property.
+              </p>
+            ) : (
+              <div className="divide-y">
+                {fees.map((fee) => (
+                  <div key={fee.id} className="flex items-center justify-between py-3 gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{fee.fee_name}</p>
+                      <p className="text-xs text-muted-foreground capitalize">
+                        {fee.fee_type.replace(/_/g, " ")} &middot;{" "}
+                        {fee.amount_type === "percentage"
+                          ? `${fee.amount}%`
+                          : `$${fee.amount}`}{" "}
+                        &middot; {fee.applies_to.replace(/_/g, " ")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Badge
+                        className={
+                          fee.is_active
+                            ? "bg-green-100 text-green-800 hover:bg-green-100"
+                            : "bg-red-100 text-red-800 hover:bg-red-100"
+                        }
+                      >
+                        {fee.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        disabled={deletingFeeId === fee.id}
+                        onClick={() => deleteFee(fee.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setDeleteFeesModalOpen(false); setDeleteFeesPropertyId(null); }}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

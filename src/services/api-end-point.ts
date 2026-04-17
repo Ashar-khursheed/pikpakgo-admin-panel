@@ -38,4 +38,8 @@ export const apiUrl = {
   createBlogPost: "admin/blog/posts",
   updateBlogPost: "admin/blog/posts",
   deleteBlogPost: "admin/blog/posts",
+  restoreBlogPost: "admin/blog/posts",
+  toggleBlogPostFeatured: "admin/blog/posts",
+  updateBlogPostStatus: "admin/blog/posts",
+  addPropertyFee: "admin/properties",
 };

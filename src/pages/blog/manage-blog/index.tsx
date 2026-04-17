@@ -21,6 +21,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  RotateCcw,
   Search,
   Star,
   Trash2,
@@ -96,6 +97,9 @@ const buildColumns = (
   onView: (id: number) => void,
   onEdit: (id: number) => void,
   onDelete: (item: BlogPost) => void,
+  onRestore: (item: BlogPost) => void,
+  onToggleFeatured: (item: BlogPost) => void,
+  onChangeStatus: (item: BlogPost) => void,
 ): Column<BlogPost>[] => [
   {
     header: "Title",
@@ -136,11 +140,14 @@ const buildColumns = (
   },
   {
     header: "Status",
-    render: (p) => (
-      <Badge className={statusBadge(p.status)}>
-        {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
-      </Badge>
-    ),
+    render: (p) =>
+      p.deleted_at ? (
+        <Badge className="bg-gray-200 text-gray-600 hover:bg-gray-200">Deleted</Badge>
+      ) : (
+        <Badge className={statusBadge(p.status)}>
+          {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
+        </Badge>
+      ),
   },
   {
     header: "Featured",
@@ -189,17 +196,43 @@ const buildColumns = (
               <Eye className="h-4 w-4 text-muted-foreground" />
               View
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onEdit(p.id)} className="gap-2">
-              <Pencil className="h-4 w-4 text-muted-foreground" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onDelete(p)}
-              className="gap-2 text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
+            {p.deleted_at ? (
+              <DropdownMenuItem
+                onClick={() => onRestore(p)}
+                className="gap-2 text-green-600 focus:text-green-600"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Restore
+              </DropdownMenuItem>
+            ) : (
+              <>
+                <DropdownMenuItem onClick={() => onEdit(p.id)} className="gap-2">
+                  <Pencil className="h-4 w-4 text-muted-foreground" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onToggleFeatured(p)}
+                  className="gap-2"
+                >
+                  <Star className="h-4 w-4 text-muted-foreground" />
+                  {p.is_featured ? "Unfeature" : "Feature"}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onChangeStatus(p)}
+                  className="gap-2"
+                >
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  Change Status
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onDelete(p)}
+                  className="gap-2 text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -222,6 +255,10 @@ function ManageBlog() {
 
   // ── Modal state
   const [deleteItem, setDeleteItem] = useState<BlogPost | null>(null);
+  const [restoreItem, setRestoreItem] = useState<BlogPost | null>(null);
+  const [featuredItem, setFeaturedItem] = useState<BlogPost | null>(null);
+  const [statusItem, setStatusItem] = useState<BlogPost | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState("published");
 
   // ── Fetch categories for filter dropdown
   const { data: categoriesData } = useQuery({
@@ -259,7 +296,7 @@ function ManageBlog() {
   const totalPages = data?.data?.last_page ?? 1;
   const total = data?.data?.total ?? 0;
 
-  // ── Delete mutation
+  // ── Delete mutation (soft delete)
   const { mutate: deletePost, isPending: isDeleting } = useMutation({
     mutationFn: () =>
       makeApiRequest(`${apiUrl.deleteBlogPost}/${deleteItem?.id}`, {
@@ -272,6 +309,67 @@ function ManageBlog() {
     },
     onError: () => {
       toast.error("Failed to delete blog post");
+    },
+  });
+
+  // ── Restore mutation
+  const { mutate: restorePost, isPending: isRestoring } = useMutation({
+    mutationFn: () =>
+      makeApiRequest(
+        `${apiUrl.restoreBlogPost}/${restoreItem?.id}/restore`,
+        { method: "PUT" },
+      ),
+    onSuccess: () => {
+      toast.success("Blog post restored successfully");
+      queryClient.invalidateQueries({ queryKey: ["blog-posts"] });
+      setRestoreItem(null);
+    },
+    onError: () => {
+      toast.error("Failed to restore blog post");
+    },
+  });
+
+  // ── Toggle featured mutation
+  const { mutate: toggleFeatured, isPending: isTogglingFeatured } = useMutation({
+    mutationFn: () =>
+      makeApiRequest(
+        `${apiUrl.toggleBlogPostFeatured}/${featuredItem?.id}/toggle-featured`,
+        { method: "PUT" },
+      ),
+    onSuccess: () => {
+      toast.success(
+        featuredItem?.is_featured
+          ? "Post removed from featured"
+          : "Post marked as featured",
+      );
+      queryClient.invalidateQueries({ queryKey: ["blog-posts"] });
+      setFeaturedItem(null);
+    },
+    onError: () => {
+      toast.error("Failed to update featured status");
+    },
+  });
+
+  // ── Change status mutation
+  const { mutate: changeStatus, isPending: isChangingStatus } = useMutation({
+    mutationFn: () =>
+      makeApiRequest(
+        `${apiUrl.updateBlogPostStatus}/${statusItem?.id}/status`,
+        {
+          method: "PUT",
+          data: {
+            status: selectedStatus,
+            published_at: new Date().toISOString(),
+          },
+        },
+      ),
+    onSuccess: () => {
+      toast.success("Status updated successfully");
+      queryClient.invalidateQueries({ queryKey: ["blog-posts"] });
+      setStatusItem(null);
+    },
+    onError: () => {
+      toast.error("Failed to update status");
     },
   });
 
@@ -297,6 +395,133 @@ function ManageBlog() {
 
   return (
     <>
+      {/* ── Restore Modal ────────────────────────────────────────────────────── */}
+      <Modal
+        isOpen={restoreItem !== null}
+        onClose={() => setRestoreItem(null)}
+        title="Restore Blog Post"
+        width="max-w-md"
+        footerBtnText="Yes, Restore"
+        loading={isRestoring}
+        onConfirm={() => restorePost()}
+      >
+        {restoreItem && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 rounded-lg p-3 bg-green-50 border border-green-200">
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-green-500" />
+              <p className="text-sm font-medium text-green-800">
+                "{restoreItem.title}" will be restored
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              This post was soft-deleted. Restoring it will make it available again.
+            </p>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Toggle Featured Modal ─────────────────────────────────────────────── */}
+      <Modal
+        isOpen={featuredItem !== null}
+        onClose={() => setFeaturedItem(null)}
+        title={featuredItem?.is_featured ? "Remove from Featured" : "Mark as Featured"}
+        width="max-w-md"
+        footerBtnText={featuredItem?.is_featured ? "Yes, Unfeature" : "Yes, Feature"}
+        loading={isTogglingFeatured}
+        onConfirm={() => toggleFeatured()}
+      >
+        {featuredItem && (
+          <div className="space-y-3">
+            <div
+              className={`flex items-center gap-3 rounded-lg p-3 ${
+                featuredItem.is_featured
+                  ? "bg-yellow-50 border border-yellow-200"
+                  : "bg-yellow-50 border border-yellow-200"
+              }`}
+            >
+              <Star
+                className={`h-4 w-4 flex-shrink-0 ${
+                  featuredItem.is_featured
+                    ? "text-yellow-500 fill-yellow-500"
+                    : "text-yellow-500"
+                }`}
+              />
+              <p className="text-sm font-medium text-yellow-800">
+                {featuredItem.is_featured
+                  ? `"${featuredItem.title}" will be removed from featured`
+                  : `"${featuredItem.title}" will be marked as featured`}
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {featuredItem.is_featured
+                ? "This post will no longer appear in the featured section."
+                : "This post will appear in the featured section on the frontend."}
+            </p>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Change Status Modal ───────────────────────────────────────────────── */}
+      <Modal
+        isOpen={statusItem !== null}
+        onClose={() => setStatusItem(null)}
+        title="Change Post Status"
+        width="max-w-md"
+        footerBtnText="Update Status"
+        loading={isChangingStatus}
+        onConfirm={() => changeStatus()}
+      >
+        {statusItem && (
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/40 p-4 space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Post Details
+              </p>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Title</span>
+                <span className="font-medium line-clamp-1 max-w-[200px]">
+                  {statusItem.title}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Current Status</span>
+                <Badge className={statusBadge(statusItem.status)}>
+                  {statusItem.status.charAt(0).toUpperCase() +
+                    statusItem.status.slice(1)}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">New Status</label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    {selectedStatus.charAt(0).toUpperCase() +
+                      selectedStatus.slice(1)}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-full min-w-[200px]">
+                  {["draft", "published", "scheduled", "archived"].map((s) => (
+                    <DropdownMenuItem
+                      key={s}
+                      onClick={() => setSelectedStatus(s)}
+                    >
+                      {s.charAt(0).toUpperCase() + s.slice(1)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Current date and time will be used as <strong>published_at</strong>.
+            </p>
+          </div>
+        )}
+      </Modal>
+
       {/* ── Delete Modal ─────────────────────────────────────────────────────── */}
       <Modal
         isOpen={deleteItem !== null}
@@ -312,7 +537,7 @@ function ManageBlog() {
             <div className="flex items-center gap-3 rounded-lg p-3 bg-red-50 border border-red-200">
               <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-red-500" />
               <p className="text-sm font-medium text-red-800">
-                This action cannot be undone
+                This will soft-delete the post (can be restored)
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -320,7 +545,7 @@ function ManageBlog() {
               <span className="font-semibold text-foreground">
                 "{deleteItem.title}"
               </span>
-              ? All associated data will be permanently removed.
+              ? You can restore it later.
             </p>
           </div>
         )}
@@ -378,7 +603,10 @@ function ManageBlog() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline">
-                    {statusFilter === "--" ? "All Status" : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+                    {statusFilter === "--"
+                      ? "All Status"
+                      : statusFilter.charAt(0).toUpperCase() +
+                        statusFilter.slice(1)}
                     <ChevronDown className="ml-2 h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -388,7 +616,9 @@ function ManageBlog() {
                       key={s}
                       onClick={() => handleStatusChange(s)}
                     >
-                      {s === "--" ? "All Status" : s.charAt(0).toUpperCase() + s.slice(1)}
+                      {s === "--"
+                        ? "All Status"
+                        : s.charAt(0).toUpperCase() + s.slice(1)}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -400,7 +630,8 @@ function ManageBlog() {
                   <Button variant="outline">
                     {categoryFilter === null
                       ? "All Categories"
-                      : (categories.find((c) => c.id === categoryFilter)?.name ?? "Category")}
+                      : (categories.find((c) => c.id === categoryFilter)
+                          ?.name ?? "Category")}
                     <ChevronDown className="ml-2 h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -444,7 +675,11 @@ function ManageBlog() {
                       key={f}
                       onClick={() => handleFeaturedChange(f)}
                     >
-                      {f === "--" ? "All Featured" : f === "true" ? "Featured" : "Not Featured"}
+                      {f === "--"
+                        ? "All Featured"
+                        : f === "true"
+                        ? "Featured"
+                        : "Not Featured"}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
@@ -458,6 +693,14 @@ function ManageBlog() {
                 (id) => navigate(`/blog/manage-blog/${id}`),
                 (id) => navigate(`/blog/manage-blog/${id}/edit`),
                 (item) => setDeleteItem(item),
+                (item) => setRestoreItem(item),
+                (item) => {
+                  setFeaturedItem(item);
+                },
+                (item) => {
+                  setSelectedStatus(item.status);
+                  setStatusItem(item);
+                },
               )}
               data={posts}
               loading={isFetching}
