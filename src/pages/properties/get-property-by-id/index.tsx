@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -33,9 +34,11 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Search,
   Star,
   Tag,
   Trash2,
+  X,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -45,6 +48,26 @@ import type { Swiper as SwiperType } from "swiper";
 import toast from "react-hot-toast";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+interface SeoConfig {
+  id: number;
+  route_slug: string;
+  route_path: string;
+  meta_title: string | null;
+  meta_description: string | null;
+  og_title: string | null;
+  og_description: string | null;
+  og_image: string | null;
+  twitter_card: string | null;
+  twitter_title: string | null;
+  twitter_description: string | null;
+  twitter_image: string | null;
+  canonical_url: string | null;
+  no_index: boolean;
+  no_follow: boolean;
+  schema_markup: object | null;
+  is_active: boolean;
+}
+
 interface Bathroom {
   roomSubType: string;
   amenities?: {
@@ -86,6 +109,10 @@ interface Property {
   booking_count: number;
   rating_average: number | null;
   rating_count: number;
+  meta_title: string | null;
+  meta_description: string | null;
+  seo_slug: string | null;
+  seo_config: SeoConfig | null;
   last_synced_at: string | null;
   created_at: string;
   updated_at: string;
@@ -149,6 +176,15 @@ const DEFAULT_FEE_FORM = {
   is_active: true,
 };
 // ─────────────────────────────────────────────────────────────────────────────
+
+function slugify(str: string) {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+}
 
 function formatAmenityLabel(key: string) {
   return key
@@ -291,6 +327,25 @@ function PropertyDetail() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingFee, setDeletingFee] = useState<PropertyFee | null>(null);
 
+  const [seoModalOpen, setSeoModalOpen] = useState(false);
+  const [seoForm, setSeoForm] = useState({
+    seo_slug: "",
+    meta_title: "",
+    meta_description: "",
+    og_title: "",
+    og_description: "",
+    og_image: "",
+    twitter_card: "summary_large_image",
+    twitter_title: "",
+    twitter_description: "",
+    twitter_image: "",
+    canonical_url: "",
+    no_index: false,
+    no_follow: false,
+    schema_markup: "",
+    is_active: true,
+  });
+
   // ─── Fetch property ───────────────────────────────────────────────────────────
   const { data, isFetching, refetch } = useQuery({
     queryKey: ["property", id],
@@ -356,6 +411,59 @@ function PropertyDetail() {
     },
     onError: () => toast.error("Failed to delete fee"),
   });
+
+  // ─── SEO mutation ─────────────────────────────────────────────────────────────
+  const { mutate: updateSeo, isPending: isSeoSaving } = useMutation({
+    mutationFn: (payload: typeof seoForm) =>
+      makeApiRequest(`${apiUrl.updateSeo}/${property?.seo_config?.id}`, {
+        method: "PUT",
+        data: {
+          ...payload,
+          seo_slug: slugify(payload.seo_slug),
+          schema_markup: payload.schema_markup.trim()
+            ? JSON.parse(payload.schema_markup)
+            : null,
+        },
+      }),
+    onSuccess: () => {
+      toast.success("SEO updated successfully");
+      setSeoModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["property", id] });
+    },
+    onError: () => toast.error("Failed to update SEO"),
+  });
+
+  const handleSeoOpen = () => {
+    const s = property?.seo_config;
+    setSeoForm({
+      seo_slug: property?.seo_slug ?? s?.route_slug ?? "",
+      meta_title: s?.meta_title ?? "",
+      meta_description: s?.meta_description ?? "",
+      og_title: s?.og_title ?? "",
+      og_description: s?.og_description ?? "",
+      og_image: s?.og_image ?? "",
+      twitter_card: s?.twitter_card ?? "summary_large_image",
+      twitter_title: s?.twitter_title ?? "",
+      twitter_description: s?.twitter_description ?? "",
+      twitter_image: s?.twitter_image ?? "",
+      canonical_url: s?.canonical_url ?? "",
+      no_index: s?.no_index ?? false,
+      no_follow: s?.no_follow ?? false,
+      schema_markup: s?.schema_markup ? JSON.stringify(s.schema_markup, null, 2) : "",
+      is_active: s?.is_active ?? true,
+    });
+    setSeoModalOpen(true);
+  };
+
+  const handleSeoSave = () => {
+    try {
+      if (seoForm.schema_markup.trim()) JSON.parse(seoForm.schema_markup);
+    } catch {
+      toast.error("Schema markup must be valid JSON");
+      return;
+    }
+    updateSeo(seoForm);
+  };
 
   // ─── Handlers ────────────────────────────────────────────────────────────────
   const handleAddSubmit = () => {
@@ -815,6 +923,60 @@ function PropertyDetail() {
           </CardContent>
         </Card>
 
+       
+
+        {/* SEO */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Search className="h-4 w-4" /> SEO
+              </CardTitle>
+              <Button size="sm" variant="outline" onClick={handleSeoOpen} disabled={!property.seo_config}>
+                <Pencil className="h-4 w-4 mr-1" /> Edit
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {property.seo_config ? (
+              <div className="divide-y text-sm">
+                {[
+                  ["SEO Slug", property.seo_slug],
+                  ["Meta Title", property.seo_config.meta_title],
+                  ["Meta Description", property.seo_config.meta_description],
+                  ["OG Title", property.seo_config.og_title],
+                  ["OG Description", property.seo_config.og_description],
+                  ["OG Image", property.seo_config.og_image],
+                  ["Twitter Card", property.seo_config.twitter_card],
+                  ["Twitter Title", property.seo_config.twitter_title],
+                  ["Twitter Description", property.seo_config.twitter_description],
+                  ["Twitter Image", property.seo_config.twitter_image],
+                  ["Canonical URL", property.seo_config.canonical_url],
+                ].map(([label, val]) => (
+                  <div key={label} className="flex justify-between py-2 gap-4">
+                    <span className="text-muted-foreground shrink-0">{label}</span>
+                    <span className="font-medium text-right truncate max-w-xs">{val || "—"}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between py-2 gap-4">
+                  <span className="text-muted-foreground shrink-0">No Index</span>
+                  <Badge className={property.seo_config.no_index ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}>
+                    {property.seo_config.no_index ? "Yes" : "No"}
+                  </Badge>
+                </div>
+                <div className="flex justify-between py-2 gap-4">
+                  <span className="text-muted-foreground shrink-0">No Follow</span>
+                  <Badge className={property.seo_config.no_follow ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}>
+                    {property.seo_config.no_follow ? "Yes" : "No"}
+                  </Badge>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No SEO config found for this property.</p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Amenities */}
         {property.amenities?.length > 0 && (
           <Card>
@@ -895,6 +1057,115 @@ function PropertyDetail() {
             </Button>
             <Button onClick={handleEditSubmit} disabled={isUpdating}>
               {isUpdating ? "Updating..." : "Update Fee"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── SEO Modal ─────────────────────────────────────────────────────── */}
+      <Dialog open={seoModalOpen} onOpenChange={(open) => { if (!open) setSeoModalOpen(false); }}>
+        <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Search className="h-4 w-4" /> Edit SEO Config
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            {/* SEO Slug */}
+            <div className="space-y-1.5">
+              <Label>SEO Slug</Label>
+              <Input
+                placeholder="e.g. arshad khan"
+                value={seoForm.seo_slug}
+                onChange={(e) => setSeoForm((f) => ({ ...f, seo_slug: e.target.value }))}
+              />
+              {seoForm.seo_slug.trim() && (
+                <p className="text-xs text-muted-foreground">
+                  Preview:{" "}
+                  <span className="font-mono text-primary">/{slugify(seoForm.seo_slug)}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Meta Title</Label>
+                <Input placeholder="e.g. Luxury Villa Dubai" value={seoForm.meta_title} onChange={(e) => setSeoForm((f) => ({ ...f, meta_title: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Canonical URL</Label>
+                <Input placeholder="https://..." value={seoForm.canonical_url} onChange={(e) => setSeoForm((f) => ({ ...f, canonical_url: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Meta Description</Label>
+              <Textarea rows={2} placeholder="Short description for search engines" value={seoForm.meta_description} onChange={(e) => setSeoForm((f) => ({ ...f, meta_description: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>OG Title</Label>
+                <Input placeholder="OG Title" value={seoForm.og_title} onChange={(e) => setSeoForm((f) => ({ ...f, og_title: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>OG Image URL</Label>
+                <Input placeholder="https://..." value={seoForm.og_image} onChange={(e) => setSeoForm((f) => ({ ...f, og_image: e.target.value }))} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>OG Description</Label>
+              <Input placeholder="OG Description" value={seoForm.og_description} onChange={(e) => setSeoForm((f) => ({ ...f, og_description: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Twitter Title</Label>
+                <Input placeholder="Twitter Title" value={seoForm.twitter_title} onChange={(e) => setSeoForm((f) => ({ ...f, twitter_title: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Twitter Image URL</Label>
+                <Input placeholder="https://..." value={seoForm.twitter_image} onChange={(e) => setSeoForm((f) => ({ ...f, twitter_image: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Twitter Description</Label>
+                <Input placeholder="Twitter Description" value={seoForm.twitter_description} onChange={(e) => setSeoForm((f) => ({ ...f, twitter_description: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Twitter Card</Label>
+                <Select value={seoForm.twitter_card} onValueChange={(v) => setSeoForm((f) => ({ ...f, twitter_card: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="summary">Summary</SelectItem>
+                    <SelectItem value="summary_large_image">Summary Large Image</SelectItem>
+                    <SelectItem value="app">App</SelectItem>
+                    <SelectItem value="player">Player</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Schema Markup (JSON-LD)</Label>
+              <Textarea rows={4} className="font-mono text-xs" placeholder='{"@context":"https://schema.org"}' value={seoForm.schema_markup} onChange={(e) => setSeoForm((f) => ({ ...f, schema_markup: e.target.value }))} />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <Label className="text-sm">No Index</Label>
+                <Switch checked={seoForm.no_index} onCheckedChange={(v) => setSeoForm((f) => ({ ...f, no_index: v }))} />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <Label className="text-sm">No Follow</Label>
+                <Switch checked={seoForm.no_follow} onCheckedChange={(v) => setSeoForm((f) => ({ ...f, no_follow: v }))} />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <Label className="text-sm">Active</Label>
+                <Switch checked={seoForm.is_active} onCheckedChange={(v) => setSeoForm((f) => ({ ...f, is_active: v }))} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSeoModalOpen(false)} disabled={isSeoSaving}>Cancel</Button>
+            <Button onClick={handleSeoSave} disabled={isSeoSaving}>
+              {isSeoSaving ? "Saving..." : "Save SEO"}
             </Button>
           </DialogFooter>
         </DialogContent>

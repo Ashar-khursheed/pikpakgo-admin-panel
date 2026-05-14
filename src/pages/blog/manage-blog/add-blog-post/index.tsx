@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -21,6 +21,8 @@ import {
   Star,
   MessageSquare,
   CalendarDays,
+  Upload,
+  X,
 } from "lucide-react";
 
 import makeApiRequest from "@/services/axios";
@@ -57,8 +59,8 @@ interface FormState {
   blog_category_id: string;
   excerpt: string;
   content: string;
-  featured_image: string;
-  gallery: string[];
+  featured_image: File | null;
+  gallery: File[];
   tags: string[];
   status: string;
   published_at: string;
@@ -68,10 +70,10 @@ interface FormState {
   meta_description: string;
   og_title: string;
   og_description: string;
-  og_image: string;
+  og_image: File | null;
   twitter_title: string;
   twitter_description: string;
-  twitter_image: string;
+  twitter_image: File | null;
   canonical_url: string;
   no_index: boolean;
   schema_markup: string;
@@ -106,6 +108,188 @@ function slugify(str: string) {
     .trim()
     .replace(/[^a-z0-9\s-]/g, "")
     .replace(/\s+/g, "-");
+}
+
+// ─── Single Image Drop Zone ────────────────────────────────────────────────────
+function ImageDropZone({
+  value,
+  onChange,
+  label,
+}: {
+  value: File | null;
+  onChange: (file: File | null) => void;
+  label?: string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const preview = value ? URL.createObjectURL(value) : null;
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragging(false);
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith("image/")) onChange(file);
+    },
+    [onChange]
+  );
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) onChange(file);
+    e.target.value = "";
+  };
+
+  return (
+    <div className="space-y-2">
+      {label && (
+        <Label className="flex items-center gap-1.5 text-sm font-medium">
+          <Image className="w-3.5 h-3.5 text-muted-foreground" />
+          {label}
+        </Label>
+      )}
+      {preview ? (
+        <div className="relative w-full rounded-lg overflow-hidden border bg-muted">
+          <img
+            src={preview}
+            alt="preview"
+            className="w-full h-44 object-cover"
+          />
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white rounded-full p-1"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+          <p className="text-xs text-muted-foreground px-3 py-1.5 truncate bg-background border-t">
+            {value?.name}
+          </p>
+        </div>
+      ) : (
+        <div
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          className={`flex flex-col items-center justify-center gap-2 h-36 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+            dragging
+              ? "border-primary bg-primary/5"
+              : "border-muted-foreground/25 bg-muted/40 hover:border-primary/50 hover:bg-primary/5"
+          }`}
+        >
+          <Upload className="w-6 h-6 text-muted-foreground" />
+          <p className="text-sm text-muted-foreground text-center">
+            Drag & drop an image here, or{" "}
+            <span className="text-primary font-medium">choose file</span>
+          </p>
+          <p className="text-xs text-muted-foreground">PNG, JPG, WEBP</p>
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFile}
+      />
+    </div>
+  );
+}
+
+// ─── Gallery Drop Zone ─────────────────────────────────────────────────────────
+function GalleryDropZone({
+  files,
+  onChange,
+}: {
+  files: File[];
+  onChange: (files: File[]) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const addFiles = useCallback(
+    (incoming: FileList | File[]) => {
+      const newFiles = Array.from(incoming).filter((f) =>
+        f.type.startsWith("image/")
+      );
+      const merged = [
+        ...files,
+        ...newFiles.filter((n) => !files.some((f) => f.name === n.name)),
+      ];
+      onChange(merged);
+    },
+    [files, onChange]
+  );
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    addFiles(e.dataTransfer.files);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) addFiles(e.target.files);
+    e.target.value = "";
+  };
+
+  const remove = (name: string) => onChange(files.filter((f) => f.name !== name));
+
+  return (
+    <div className="space-y-2">
+      <Label className="flex items-center gap-1.5 text-sm font-medium">
+        <Image className="w-3.5 h-3.5 text-muted-foreground" />
+        Gallery Images
+      </Label>
+      <div
+        onClick={() => inputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={handleDrop}
+        className={`flex flex-col items-center justify-center gap-2 h-28 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
+          dragging
+            ? "border-primary bg-primary/5"
+            : "border-muted-foreground/25 bg-muted/40 hover:border-primary/50 hover:bg-primary/5"
+        }`}
+      >
+        <Upload className="w-5 h-5 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground text-center">
+          Drag & drop images or{" "}
+          <span className="text-primary font-medium">choose files</span>
+        </p>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleFileInput}
+      />
+      {files.length > 0 && (
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mt-1">
+          {files.map((file) => {
+            const url = URL.createObjectURL(file);
+            return (
+              <div
+                key={file.name}
+                className="relative group rounded-md overflow-hidden border aspect-square"
+              >
+                <img src={url} alt={file.name} className="w-full h-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => remove(file.name)}
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Field wrapper ────────────────────────────────────────────────────────────
@@ -183,7 +367,6 @@ export default function AddBlogPost() {
 
   const [errors, setErrors] = useState<FormErrors>({});
   const [tagInput, setTagInput] = useState("");
-  const [galleryInput, setGalleryInput] = useState("");
 
   const [form, setForm] = useState<FormState>({
     title: "",
@@ -191,7 +374,7 @@ export default function AddBlogPost() {
     blog_category_id: "",
     excerpt: "",
     content: "",
-    featured_image: "",
+    featured_image: null,
     gallery: [],
     tags: [],
     status: "draft",
@@ -202,10 +385,10 @@ export default function AddBlogPost() {
     meta_description: "",
     og_title: "",
     og_description: "",
-    og_image: "",
+    og_image: null,
     twitter_title: "",
     twitter_description: "",
-    twitter_image: "",
+    twitter_image: null,
     canonical_url: "",
     no_index: false,
     schema_markup: "",
@@ -239,28 +422,12 @@ export default function AddBlogPost() {
   // ── Tags
   const addTag = () => {
     const t = tagInput.trim();
-    if (t && !form.tags.includes(t)) {
-      set("tags", [...form.tags, t]);
-    }
+    if (t && !form.tags.includes(t)) set("tags", [...form.tags, t]);
     setTagInput("");
   };
 
-  const removeTag = (tag: string) => {
+  const removeTag = (tag: string) =>
     set("tags", form.tags.filter((t) => t !== tag));
-  };
-
-  // ── Gallery
-  const addGalleryImage = () => {
-    const url = galleryInput.trim();
-    if (url && !form.gallery.includes(url)) {
-      set("gallery", [...form.gallery, url]);
-    }
-    setGalleryInput("");
-  };
-
-  const removeGalleryImage = (url: string) => {
-    set("gallery", form.gallery.filter((g) => g !== url));
-  };
 
   // ── Validation
   const validate = (): boolean => {
@@ -274,61 +441,62 @@ export default function AddBlogPost() {
     return Object.keys(errs).length === 0;
   };
 
-  // ── Mutation
+  // ── Mutation (multipart/form-data)
   const { mutate, isPending } = useMutation({
-    mutationFn: (payload: object) =>
-      makeApiRequest(apiUrl.createBlogPost, { method: "POST", data: payload }),
+    mutationFn: (fd: FormData) =>
+      makeApiRequest(apiUrl.createBlogPost, {
+        method: "POST",
+        data: fd,
+        headers: { "Content-Type": "multipart/form-data" },
+      }),
     onSuccess: () => {
       toast.success("Blog post created successfully");
       queryClient.invalidateQueries({ queryKey: ["blog-posts"] });
       navigate("/blog/manage-blog");
     },
-    onError: () => {
-      toast.error("Failed to create blog post");
-    },
+    onError: () => toast.error("Failed to create blog post"),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
 
-    let schemaObj: object | null = null;
+    let schemaObj: string | null = null;
     if (form.schema_markup.trim()) {
       try {
-        schemaObj = JSON.parse(form.schema_markup);
+        schemaObj = JSON.stringify(JSON.parse(form.schema_markup));
       } catch {
         setErrors((p) => ({ ...p, schema_markup: "Invalid JSON format" }));
         return;
       }
     }
 
-    mutate({
-      title: form.title,
-      slug: form.slug,
-      blog_category_id: Number(form.blog_category_id),
-      excerpt: form.excerpt || null,
-      content: form.content,
-      featured_image: form.featured_image || null,
-      gallery: form.gallery,
-      tags: form.tags,
-      status: form.status,
-      published_at: form.published_at
-        ? new Date(form.published_at).toISOString()
-        : null,
-      is_featured: form.is_featured,
-      allow_comments: form.allow_comments,
-      meta_title: form.meta_title || null,
-      meta_description: form.meta_description || null,
-      og_title: form.og_title || null,
-      og_description: form.og_description || null,
-      og_image: form.og_image || null,
-      twitter_title: form.twitter_title || null,
-      twitter_description: form.twitter_description || null,
-      twitter_image: form.twitter_image || null,
-      canonical_url: form.canonical_url || null,
-      no_index: form.no_index,
-      schema_markup: schemaObj,
-    });
+    const fd = new FormData();
+    fd.append("title", form.title);
+    fd.append("slug", form.slug);
+    fd.append("blog_category_id", form.blog_category_id);
+    if (form.excerpt) fd.append("excerpt", form.excerpt);
+    fd.append("content", form.content);
+    if (form.featured_image) fd.append("featured_image", form.featured_image);
+    form.gallery.forEach((f) => fd.append("gallery[]", f));
+    form.tags.forEach((t) => fd.append("tags[]", t));
+    fd.append("status", form.status);
+    if (form.published_at) fd.append("published_at", new Date(form.published_at).toISOString());
+    fd.append("is_featured", String(form.is_featured));
+    fd.append("allow_comments", String(form.allow_comments));
+    if (form.meta_title) fd.append("meta_title", form.meta_title);
+    if (form.meta_description) fd.append("meta_description", form.meta_description);
+    if (form.og_title) fd.append("og_title", form.og_title);
+    if (form.og_description) fd.append("og_description", form.og_description);
+    if (form.og_image) fd.append("og_image", form.og_image);
+    if (form.twitter_title) fd.append("twitter_title", form.twitter_title);
+    if (form.twitter_description) fd.append("twitter_description", form.twitter_description);
+    if (form.twitter_image) fd.append("twitter_image", form.twitter_image);
+    if (form.canonical_url) fd.append("canonical_url", form.canonical_url);
+    fd.append("no_index", String(form.no_index));
+    if (schemaObj) fd.append("schema_markup", schemaObj);
+
+    mutate(fd);
   };
 
   return (
@@ -346,9 +514,7 @@ export default function AddBlogPost() {
         </Button>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Add Blog Post</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Create a new blog post
-          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">Create a new blog post</p>
         </div>
       </div>
 
@@ -373,13 +539,7 @@ export default function AddBlogPost() {
             </Field>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field
-                label="Slug"
-                icon={Tag}
-                required
-                error={errors.slug}
-                hint="Auto-filled from title"
-              >
+              <Field label="Slug" icon={Tag} required error={errors.slug} hint="Auto-filled from title">
                 <Input
                   placeholder="solo-travel-guide-2027"
                   value={form.slug}
@@ -387,12 +547,7 @@ export default function AddBlogPost() {
                 />
               </Field>
 
-              <Field
-                label="Category"
-                icon={FileText}
-                required
-                error={errors.blog_category_id}
-              >
+              <Field label="Category" icon={FileText} required error={errors.blog_category_id}>
                 <Select
                   value={form.blog_category_id}
                   onValueChange={(v) => set("blog_category_id", v)}
@@ -420,51 +575,18 @@ export default function AddBlogPost() {
               />
             </Field>
 
-            <Field label="Featured Image" icon={Image} hint="Filename or URL">
-              <Input
-                placeholder="solo.jpg"
-                value={form.featured_image}
-                onChange={(e) => set("featured_image", e.target.value)}
-              />
-            </Field>
+            {/* Featured Image — drag & drop */}
+            <ImageDropZone
+              label="Featured Image"
+              value={form.featured_image}
+              onChange={(f) => set("featured_image", f)}
+            />
 
-            {/* Gallery */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1.5 text-sm font-medium">
-                <Image className="w-3.5 h-3.5 text-muted-foreground" />
-                Gallery Images
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="solo1.jpg"
-                  value={galleryInput}
-                  onChange={(e) => setGalleryInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addGalleryImage())}
-                />
-                <Button type="button" variant="outline" size="sm" onClick={addGalleryImage}>
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-              {form.gallery.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {form.gallery.map((url) => (
-                    <div
-                      key={url}
-                      className="flex items-center gap-1.5 bg-muted px-2.5 py-1 rounded-full text-xs"
-                    >
-                      <span className="max-w-[160px] truncate">{url}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeGalleryImage(url)}
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Gallery — drag & drop multi */}
+            <GalleryDropZone
+              files={form.gallery}
+              onChange={(files) => set("gallery", files)}
+            />
 
             {/* Tags */}
             <div className="space-y-2">
@@ -664,22 +786,19 @@ export default function AddBlogPost() {
                   onChange={(e) => set("og_title", e.target.value)}
                 />
               </Field>
-              <Field label="OG Image" icon={Image}>
+              <Field label="OG Description" icon={Globe}>
                 <Input
-                  placeholder="solo-og.jpg"
-                  value={form.og_image}
-                  onChange={(e) => set("og_image", e.target.value)}
+                  placeholder="Travel alone safely."
+                  value={form.og_description}
+                  onChange={(e) => set("og_description", e.target.value)}
                 />
               </Field>
             </div>
-            <Field label="OG Description" icon={Globe}>
-              <Textarea
-                placeholder="Travel alone safely."
-                rows={2}
-                value={form.og_description}
-                onChange={(e) => set("og_description", e.target.value)}
-              />
-            </Field>
+            <ImageDropZone
+              label="OG Image"
+              value={form.og_image}
+              onChange={(f) => set("og_image", f)}
+            />
           </CardContent>
         </Card>
 
@@ -700,22 +819,19 @@ export default function AddBlogPost() {
                   onChange={(e) => set("twitter_title", e.target.value)}
                 />
               </Field>
-              <Field label="Twitter Image" icon={Image}>
+              <Field label="Twitter Description" icon={Twitter}>
                 <Input
-                  placeholder="solo-twitter.jpg"
-                  value={form.twitter_image}
-                  onChange={(e) => set("twitter_image", e.target.value)}
+                  placeholder="Solo travel tips"
+                  value={form.twitter_description}
+                  onChange={(e) => set("twitter_description", e.target.value)}
                 />
               </Field>
             </div>
-            <Field label="Twitter Description" icon={Twitter}>
-              <Textarea
-                placeholder="Solo travel tips"
-                rows={2}
-                value={form.twitter_description}
-                onChange={(e) => set("twitter_description", e.target.value)}
-              />
-            </Field>
+            <ImageDropZone
+              label="Twitter Image"
+              value={form.twitter_image}
+              onChange={(f) => set("twitter_image", f)}
+            />
           </CardContent>
         </Card>
 
