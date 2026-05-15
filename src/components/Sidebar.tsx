@@ -11,8 +11,10 @@ import {
   LogOut,
   LucideIcon,
   Search,
+  Shield,
   ShieldAlert
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
@@ -28,46 +30,59 @@ interface NavItem {
   subItems?: SubMenuItem[];
   badge?: number;
   section: string;
+  requiredPermission?: string;
 }
 
 // ─── Navigation ───
 const navigation: NavItem[] = [
-  // OVERVIEW
   {
     name: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
     section: "Overview",
+    // no requiredPermission — always visible
   },
   {
     name: "Properties",
     href: "/get-all-properties-listing",
     icon: LayoutDashboard,
     section: "Overview",
+    requiredPermission: "manage-properties",
   },
   {
     name: "Pricing Markup",
     href: "/get-all-pricing-markup",
     icon: LayoutDashboard,
     section: "Overview",
+    requiredPermission: "view-financials",
   },
   {
     name: "Users",
     href: "/get-all-users",
     icon: LayoutDashboard,
     section: "Overview",
+    requiredPermission: "manage-users",
   },
   {
     name: "Content CMS",
     href: "/content-cms",
     icon: FileText,
     section: "Overview",
+    requiredPermission: "manage-seo",
   },
   {
     name: "SEO Management",
     href: "/seo-management",
     icon: Search,
     section: "Overview",
+    requiredPermission: "manage-seo",
+  },
+  {
+    name: "Roles & Permissions",
+    href: "/roles-permissions",
+    icon: Shield,
+    section: "System",
+    requiredPermission: "manage-roles",
   },
   {
     name: "Blogs",
@@ -78,6 +93,7 @@ const navigation: NavItem[] = [
       { name: "Manage Blog Categories", href: "/blog/manage-blog-category" },
       { name: "Manage Blog Posts", href: "/blog/manage-blog" },
     ],
+    requiredPermission: "manage-blog",
   },
 ];
 
@@ -132,10 +148,25 @@ function hoverOff(el: HTMLElement, bg: string, color: string, border?: string) {
   if (border !== undefined) el.style.borderColor = border;
 }
 
+// ─── Sidebar Skeleton ───
+function NavSkeleton({ collapsed }: { collapsed: boolean }) {
+  const rows = [1, 2, 3, 4, 5, 6];
+  return (
+    <div style={{ padding: "8px 10px", display: "flex", flexDirection: "column", gap: 6 }}>
+      {rows.map((i) => (
+        <div key={i} className="flex items-center rounded-xl" style={{ gap: collapsed ? 0 : 9, padding: collapsed ? "7px 0" : "7px 10px", justifyContent: collapsed ? "center" : "flex-start" }}>
+          <Skeleton className="rounded-lg flex-shrink-0" style={{ width: 28, height: 28 }} />
+          {!collapsed && <Skeleton className="rounded-md flex-1" style={{ height: 14 }} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Main Sidebar ───
 export function Sidebar() {
-  const { profile, loading, error } = useAppSelector((state) => state.userProfile);
-  console.log("User Profile in Sidebar:", profile);
+  const { profile, loading: profileLoading } = useAppSelector((state) => state.userProfile);
+  const { permissions, fetched, loading: permsLoading } = useAppSelector((state) => state.rolePermissions);
   const [collapsed, setCollapsed] = useState(false);
   const [openMenus, setOpenMenus] = useState<string[]>(["Chats", "Finance"]);
   const { user } = useAuth();
@@ -149,8 +180,18 @@ export function Sidebar() {
     href.includes("?") ? currentPath === href : location.pathname === href;
   const hasActive = (subs: SubMenuItem[]) => subs.some((s) => isActive(s.href));
 
+  // Show skeleton while profile or permissions are loading
+  const isLoadingNav = profileLoading || permsLoading;
+
+  // Filter nav items by role permissions; before permissions load show all
+  const visibleNavigation = !fetched
+    ? navigation
+    : navigation.filter(
+        (item) => !item.requiredPermission || permissions.includes(item.requiredPermission)
+      );
+
   // Grouped
-  const grouped = navigation.reduce(
+  const grouped = visibleNavigation.reduce(
     (acc, item) => {
       if (!acc[item.section]) acc[item.section] = [];
       acc[item.section].push(item);
@@ -316,7 +357,9 @@ export function Sidebar() {
           nav::-webkit-scrollbar-thumb { background: ${T.scrollbar}; border-radius: 4px }
         `}</style>
 
-        {sectionOrder.map((sec, si) => {
+        {isLoadingNav ? (
+          <NavSkeleton collapsed={collapsed} />
+        ) : sectionOrder.map((sec, si) => {
           const items = grouped[sec];
           if (!items) return null;
           return (

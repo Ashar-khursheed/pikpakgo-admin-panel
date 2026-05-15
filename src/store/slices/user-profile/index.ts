@@ -22,6 +22,8 @@ export interface UserProfile {
   gender?: string;
   preferred_currency: string;
   preferred_language: string;
+  role_id?: number | null;
+  role_name?: string | null;
 }
 
 interface UserProfileState {
@@ -62,6 +64,11 @@ const userProfileSlice = createSlice({
       state.profile = null;
       state.error = null;
     },
+    setUserProfile: (state, action) => {
+      state.profile = action.payload;
+      state.loading = false;
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -80,5 +87,5 @@ const userProfileSlice = createSlice({
   },
 });
 
-export const { clearUserProfile } = userProfileSlice.actions;
+export const { clearUserProfile, setUserProfile } = userProfileSlice.actions;
 export default userProfileSlice.reducer;

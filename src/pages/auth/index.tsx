@@ -211,6 +211,9 @@
 import { useAuth } from "@/context/auth";
 import { apiUrl } from "@/services/api-end-point";
 import makeApiRequest from "@/services/axios";
+import { useAppDispatch } from "@/store/hooks";
+import { fetchRolePermissions } from "@/store/slices/role-permissions";
+import { setUserProfile } from "@/store/slices/user-profile";
 import { notify } from "@/utils/utils";
 import { useFormik } from "formik";
 import {
@@ -370,6 +373,7 @@ function FloatingInput({
 // ─────────────────────────────────────────
 const Authlogin = () => {
   const { login } = useAuth();
+  const dispatch = useAppDispatch();
   const [showPass, setShowPass] = useState(false);
   const navigate = useNavigate();
 
@@ -378,23 +382,29 @@ const Authlogin = () => {
     validationSchema,
   onSubmit: async (values, { setSubmitting }) => {
   try {
-    // API call
     const res = await makeApiRequest(apiUrl?.login, {
       data: values,
       method: "POST",
     });
 
-    console.log("Login response:", res);
+    const user = res?.data?.user;
+    const token = res?.data?.token;
 
-    // // Save to localStorage
-    localStorage.setItem("token", res?.data?.token);
-    localStorage.setItem("user", JSON.stringify(res?.data?.user));
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
 
-    // // Update auth context
-    login(res?.data?.user, res?.data?.token);
+    // Set profile in Redux from login response (no extra /me call needed)
+    dispatch(setUserProfile(user));
+
+    // Immediately fetch role permissions using role_id from login response
+    if (user?.role_id) {
+      dispatch(fetchRolePermissions(user.role_id));
+    }
+
+    login(user, token);
 
     notify({
-      message: `Welcome back, ${res?.data?.user?.first_name} ${res?.data?.user?.last_name}! 👋`,
+      message: `Welcome back, ${user?.first_name} ${user?.last_name}! 👋`,
       type: "success",
     });
 

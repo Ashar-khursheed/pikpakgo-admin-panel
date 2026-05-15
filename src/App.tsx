@@ -41,10 +41,12 @@ import MYProfile from "./pages/settings/profile";
 import EditProfile from "./pages/settings/profile/profile-edit";
 import GetAllUsers from "./pages/users";
 import UserDetail from "./pages/users/get-user-by-id";
+import RolesPermissions from "./pages/roles-permissions";
 import ProtectedRoute from "./routes/protected-route";
 import PublicRoute from "./routes/public-route";
-import { useAppDispatch } from "./store/hooks";
+import { useAppDispatch, useAppSelector } from "./store/hooks";
 import { fetchUserProfile } from "./store/slices/user-profile";
+import { fetchRolePermissions } from "./store/slices/role-permissions";
 import { store } from "./store/store";
 
 const queryClient = new QueryClient();
@@ -53,12 +55,22 @@ const queryClient = new QueryClient();
 const AppInner = () => {
   const dispatch = useAppDispatch();
   const token = localStorage.getItem("token");
+  const { profile } = useAppSelector((state) => state.userProfile);
+  const { fetched } = useAppSelector((state) => state.rolePermissions);
 
+  // On page refresh: token exists but Redux is empty — re-fetch profile
   useEffect(() => {
-    if (token) {
+    if (token && !profile) {
       dispatch(fetchUserProfile());
     }
-  }, [token, dispatch]);
+  }, [token, profile, dispatch]);
+
+  // After profile loads (from /me on refresh), fetch role permissions if not already fetched
+  useEffect(() => {
+    if (profile?.role_id && !fetched) {
+      dispatch(fetchRolePermissions(profile.role_id));
+    }
+  }, [profile?.role_id, fetched, dispatch]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -115,6 +127,7 @@ const AppInner = () => {
                 <Route path="/blog/manage-blog/add" element={<AddBlogPost />} />
                 <Route path="/blog/manage-blog/:id" element={<ViewBlogPost />} />
                 <Route path="/blog/manage-blog/:id/edit" element={<EditBlogPost />} />
+                <Route path="/roles-permissions" element={<RolesPermissions />} />
               </Route>
 
               {/* Catch-all route */}
