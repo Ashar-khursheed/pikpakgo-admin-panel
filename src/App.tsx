@@ -42,6 +42,7 @@ import EditProfile from "./pages/settings/profile/profile-edit";
 import GetAllUsers from "./pages/users";
 import UserDetail from "./pages/users/get-user-by-id";
 import RolesPermissions from "./pages/roles-permissions";
+import AdminSettings from "./pages/admin-settings";
 import ProtectedRoute from "./routes/protected-route";
 import PublicRoute from "./routes/public-route";
 import { useAppDispatch, useAppSelector } from "./store/hooks";
@@ -128,6 +129,7 @@ const AppInner = () => {
                 <Route path="/blog/manage-blog/:id" element={<ViewBlogPost />} />
                 <Route path="/blog/manage-blog/:id/edit" element={<EditBlogPost />} />
                 <Route path="/roles-permissions" element={<RolesPermissions />} />
+                <Route path="/admin-settings" element={<AdminSettings />} />
               </Route>
 
               {/* Catch-all route */}

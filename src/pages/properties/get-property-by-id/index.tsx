@@ -29,6 +29,7 @@ import {
   ArrowLeft,
   Building2,
   Calendar,
+  CheckCircle,
   Eye,
   MapPin,
   Pencil,
@@ -39,6 +40,7 @@ import {
   Tag,
   Trash2,
   X,
+  XCircle,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -105,6 +107,7 @@ interface Property {
   price_currency: string;
   is_active: boolean;
   is_featured: boolean;
+  approval_status: "pending" | "approved" | "rejected" | null;
   view_count: number;
   booking_count: number;
   rating_average: number | null;
@@ -327,6 +330,10 @@ function PropertyDetail() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletingFee, setDeletingFee] = useState<PropertyFee | null>(null);
 
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+
   const [seoModalOpen, setSeoModalOpen] = useState(false);
   const [seoForm, setSeoForm] = useState({
     seo_slug: "",
@@ -432,6 +439,42 @@ function PropertyDetail() {
     },
     onError: () => toast.error("Failed to update SEO"),
   });
+
+  // ─── Approve mutation ─────────────────────────────────────────────────────────
+  const { mutate: approveProperty, isPending: isApproving } = useMutation({
+    mutationFn: () =>
+      makeApiRequest(`${apiUrl.approveProperty}/${id}/approve`, { method: "POST" }),
+    onSuccess: () => {
+      toast.success("Property approved successfully");
+      setApproveConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["property", id] });
+    },
+    onError: () => toast.error("Failed to approve property"),
+  });
+
+  // ─── Reject mutation ──────────────────────────────────────────────────────────
+  const { mutate: rejectProperty, isPending: isRejecting } = useMutation({
+    mutationFn: (reason: string) =>
+      makeApiRequest(`${apiUrl.rejectProperty}/${id}/reject`, {
+        method: "POST",
+        data: { reason },
+      }),
+    onSuccess: () => {
+      toast.success("Property rejected successfully");
+      setRejectDialogOpen(false);
+      setRejectReason("");
+      queryClient.invalidateQueries({ queryKey: ["property", id] });
+    },
+    onError: () => toast.error("Failed to reject property"),
+  });
+
+  const handleRejectSubmit = () => {
+    if (!rejectReason.trim()) {
+      toast.error("Please enter a reason for rejection");
+      return;
+    }
+    rejectProperty(rejectReason);
+  };
 
   const handleSeoOpen = () => {
     const s = property?.seo_config;
@@ -635,6 +678,40 @@ function PropertyDetail() {
               View on Provider
             </Button>
           )}
+          {property.approval_status === "pending" && (
+            <>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => { setRejectReason(""); setRejectDialogOpen(true); }}
+                disabled={isApproving || isRejecting}
+                className="gap-1"
+              >
+                <XCircle className="h-4 w-4" />
+                Reject
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setApproveConfirmOpen(true)}
+                disabled={isApproving || isRejecting}
+                className="gap-1 bg-green-600 hover:bg-green-700"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Approve
+              </Button>
+            </>
+          )}
+          {property.approval_status && property.approval_status !== "pending" && (
+            <Badge
+              className={
+                property.approval_status === "approved"
+                  ? "bg-green-100 text-green-800 hover:bg-green-100"
+                  : "bg-red-100 text-red-800 hover:bg-red-100"
+              }
+            >
+              {property.approval_status === "approved" ? "Approved" : "Rejected"}
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -711,6 +788,15 @@ function PropertyDetail() {
                 <Badge className={property.is_active ? "bg-green-100 text-green-800 hover:bg-green-100" : "bg-red-100 text-red-800 hover:bg-red-100"}>
                   {property.is_active ? "Active" : "Inactive"}
                 </Badge>
+                {property.approval_status === "pending" && (
+                  <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Pending Approval</Badge>
+                )}
+                {property.approval_status === "approved" && (
+                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Approved</Badge>
+                )}
+                {property.approval_status === "rejected" && (
+                  <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Rejected</Badge>
+                )}
                 {property.is_featured && (
                   <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Featured</Badge>
                 )}
@@ -1188,6 +1274,79 @@ function PropertyDetail() {
             </Button>
             <Button variant="destructive" onClick={() => deleteFee()} disabled={isDeleting}>
               {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Approve Confirmation Modal ─────────────────────────────────────── */}
+      <Dialog open={approveConfirmOpen} onOpenChange={setApproveConfirmOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Approve Property</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            Are you sure you want to approve{" "}
+            <span className="font-medium text-foreground">{property?.name}</span>?
+            This will make the property active on the platform.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setApproveConfirmOpen(false)}
+              disabled={isApproving}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => approveProperty()}
+              disabled={isApproving}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isApproving ? "Approving..." : "OK, Approve"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Reject Reason Modal ────────────────────────────────────────────── */}
+      <Dialog
+        open={rejectDialogOpen}
+        onOpenChange={(open) => { if (!open) { setRejectDialogOpen(false); setRejectReason(""); } }}
+      >
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Reject Property</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Please provide a reason for rejecting{" "}
+              <span className="font-medium text-foreground">{property?.name}</span>.
+            </p>
+            <div className="space-y-1.5">
+              <Label>Reason</Label>
+              <Textarea
+                placeholder="e.g. Missing high-quality images"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setRejectDialogOpen(false); setRejectReason(""); }}
+              disabled={isRejecting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleRejectSubmit}
+              disabled={isRejecting || !rejectReason.trim()}
+            >
+              {isRejecting ? "Rejecting..." : "Reject Property"}
             </Button>
           </DialogFooter>
         </DialogContent>

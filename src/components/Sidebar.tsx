@@ -11,6 +11,7 @@ import {
   LogOut,
   LucideIcon,
   Search,
+  Settings,
   Shield,
   ShieldAlert
 } from "lucide-react";
@@ -81,6 +82,13 @@ const navigation: NavItem[] = [
     name: "Roles & Permissions",
     href: "/roles-permissions",
     icon: Shield,
+    section: "System",
+    requiredPermission: "manage-roles",
+  },
+  {
+    name: "Settings",
+    href: "/admin-settings",
+    icon: Settings,
     section: "System",
     requiredPermission: "manage-roles",
   },

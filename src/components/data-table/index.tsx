@@ -62,7 +62,7 @@ export function DataTable<T>({
               </TableCell>
             </TableRow>
           ) : (
-            data.map((row) => (
+            data?.map((row) => (
               <TableRow key={rowKey(row)} className="hover:bg-muted/50">
                 {columns.map((col, i) => (
                   <TableCell key={i} className={col.className}>
