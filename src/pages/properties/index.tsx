@@ -125,7 +125,7 @@ interface PropertiesApiResponse {
   data: { data: Property[] } & PaginationMeta;
 }
 
-const PROVIDERS = ["All", "ownerrez", "lodgify", "hostaway", "guesty"];
+const PROVIDERS = ["All", "ownerrez", "direct", "hotelbeds", "lodgify", "hostaway", "guesty"];
 const PER_PAGE_OPTIONS = ["10", "20", "50", "100"];
 
 // ─── Column definitions ────────────────────────────────────────────────────────
@@ -374,7 +374,7 @@ function PropertiesListing() {
 
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
-  const [provider, setProvider] = useState("ownerrez");
+  const [provider, setProvider] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [perPage, setPerPage] = useState("20");
   const [page, setPage] = useState(1);
