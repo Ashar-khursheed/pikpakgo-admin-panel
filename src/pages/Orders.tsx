@@ -323,7 +323,7 @@ export default function Orders() {
     );
   };
 
-  const columns = (() => {
+  const columns: Column<any>[] = (() => {
     if (verticalType === "properties") {
       return [
         {

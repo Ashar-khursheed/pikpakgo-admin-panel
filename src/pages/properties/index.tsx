@@ -38,6 +38,7 @@ import {
   Eye,
   MapPin,
   MoreHorizontal,
+  Pencil,
   Plus,
   RefreshCw,
   Trash2,
@@ -135,6 +136,7 @@ const buildColumns = (
   onViewDetails: (id: number) => void,
   onAddPricing: (id: number) => void,
   onDeletePricing: (id: number) => void,
+  onEditProperty: (p: Property) => void,
 ): Column<Property>[] => [
   {
     header: "Property",
@@ -269,6 +271,10 @@ const buildColumns = (
             <DropdownMenuItem onClick={() => onViewDetails(p.id)} className="gap-2">
               <Eye className="h-4 w-4 text-muted-foreground" />
               View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onEditProperty(p)} className="gap-2">
+              <Pencil className="h-4 w-4 text-muted-foreground" />
+              Edit Details
             </DropdownMenuItem>
             {p.api_data?.propertyUrl && (
               <DropdownMenuItem
@@ -661,6 +667,59 @@ function PropertiesListing() {
     setDeleteFeesModalOpen(true);
   };
 
+  // ─── Image upload state & handler ──────────────────────────────────────────
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, mode: "create" | "edit") => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploadingImage(true);
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append("image", file);
+
+        const res = await makeApiRequest<{ success: boolean; url: string }>(
+          `${apiUrl.getAllPropertiesListing}/upload-image`,
+          {
+            method: "POST",
+            data: formData,
+          }
+        );
+
+        if (res.success && res.url) {
+          if (mode === "create") {
+            setCreateForm((prev) => {
+              const updatedImages = [...prev.images, res.url];
+              return {
+                ...prev,
+                images: updatedImages,
+                featured_image: prev.featured_image || res.url,
+              };
+            });
+          } else {
+            setEditForm((prev) => {
+              const updatedImages = [...prev.images, res.url];
+              return {
+                ...prev,
+                images: updatedImages,
+                featured_image: prev.featured_image || res.url,
+              };
+            });
+          }
+          toast.success(`Uploaded ${file.name}`);
+        }
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to upload image");
+    } finally {
+      setIsUploadingImage(false);
+      e.target.value = "";
+    }
+  };
+
   // ─── Create Property state ─────────────────────────────────────────────────
   const [createPropertyOpen, setCreatePropertyOpen] = useState(false);
   const [createForm, setCreateForm] = useState({
@@ -668,6 +727,7 @@ function PropertiesListing() {
     provider: "direct",
     provider_property_id: "",
     property_type: "apartment",
+    description: "",
     country: "",
     state: "",
     city: "",
@@ -678,6 +738,8 @@ function PropertiesListing() {
     meta_description: "",
     seo_slug: "",
     is_active: true,
+    images: [] as string[],
+    featured_image: "",
   });
 
   const { mutate: createProperty, isPending: isCreatingProperty } = useMutation({
@@ -694,6 +756,7 @@ function PropertiesListing() {
         provider: "direct",
         provider_property_id: "",
         property_type: "apartment",
+        description: "",
         country: "",
         state: "",
         city: "",
@@ -704,6 +767,8 @@ function PropertiesListing() {
         meta_description: "",
         seo_slug: "",
         is_active: true,
+        images: [],
+        featured_image: "",
       });
       queryClient.invalidateQueries({ queryKey: ["properties"] });
     },
@@ -720,6 +785,74 @@ function PropertiesListing() {
     const priceVal = Number(createForm.price_from);
     createProperty({
       ...createForm,
+      price_from: isNaN(priceVal) ? 0 : priceVal,
+    });
+  };
+
+  // ─── Edit Property state ───────────────────────────────────────────────────
+  const [editPropertyOpen, setEditPropertyOpen] = useState(false);
+  const [editingPropertyId, setEditingPropertyId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    property_type: "apartment",
+    description: "",
+    country: "",
+    state: "",
+    city: "",
+    address: "",
+    price_from: "",
+    price_currency: "USD",
+    is_active: true,
+    is_featured: false,
+    images: [] as string[],
+    featured_image: "",
+  });
+
+  const { mutate: updateProperty, isPending: isUpdatingProperty } = useMutation({
+    mutationFn: (payload: typeof editForm & { price_from: number }) =>
+      makeApiRequest(`${apiUrl.getAllPropertiesListing}/${editingPropertyId}`, {
+        method: "PUT",
+        data: payload,
+      }),
+    onSuccess: () => {
+      toast.success("Property updated successfully!");
+      setEditPropertyOpen(false);
+      setEditingPropertyId(null);
+      queryClient.invalidateQueries({ queryKey: ["properties"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to update property");
+    },
+  });
+
+  const handleOpenEditModal = (p: Property) => {
+    setEditingPropertyId(p.id);
+    setEditForm({
+      name: p.name || "",
+      property_type: p.property_type || "apartment",
+      description: p.description || "",
+      country: p.country || "",
+      state: p.state || "",
+      city: p.city || "",
+      address: p.address || "",
+      price_from: p.price_from != null ? String(p.price_from) : "",
+      price_currency: p.price_currency || "USD",
+      is_active: p.is_active ?? true,
+      is_featured: p.is_featured ?? false,
+      images: p.images || [],
+      featured_image: p.featured_image || "",
+    });
+    setEditPropertyOpen(true);
+  };
+
+  const handleEditSubmit = () => {
+    if (!editForm.name.trim()) {
+      toast.error("Property name is required");
+      return;
+    }
+    const priceVal = Number(editForm.price_from);
+    updateProperty({
+      ...editForm,
       price_from: isNaN(priceVal) ? 0 : priceVal,
     });
   };
@@ -886,6 +1019,7 @@ function PropertiesListing() {
               handleViewDetails,
               handleOpenPricingModal,
               handleOpenDeleteFeesModal,
+              handleOpenEditModal,
             )}
             data={properties}
             loading={isFetching}
@@ -1303,7 +1437,7 @@ function PropertiesListing() {
 
       {/* ─── Manual Property Creation Dialog ──────────────────────────────────── */}
       <Dialog open={createPropertyOpen} onOpenChange={setCreatePropertyOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Direct Property Listing</DialogTitle>
           </DialogHeader>
@@ -1351,6 +1485,16 @@ function PropertiesListing() {
                 <Label>Supplier Provider</Label>
                 <Input value={createForm.provider} disabled />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Write detailed property description..."
+                value={createForm.description}
+                onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                rows={3}
+              />
             </div>
 
             <div className="grid grid-cols-3 gap-4 border-t pt-4">
@@ -1412,6 +1556,85 @@ function PropertiesListing() {
               </div>
             </div>
 
+            {/* ─── Images Section ────────────────────────────────────────────── */}
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-sm text-zinc-700">Property Gallery</h3>
+                  <p className="text-xs text-muted-foreground">Upload property photos. Select one as featured thumbnail.</p>
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    id="create-property-images-file"
+                    onChange={(e) => handleImageUpload(e, "create")}
+                    disabled={isUploadingImage}
+                  />
+                  <Label
+                    htmlFor="create-property-images-file"
+                    className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-input hover:bg-accent hover:text-accent-foreground h-9 px-3 cursor-pointer ${isUploadingImage ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {isUploadingImage ? "Uploading..." : "Upload Images"}
+                  </Label>
+                </div>
+              </div>
+
+              {createForm.images.length === 0 ? (
+                <div className="text-center py-6 border border-dashed rounded-lg text-sm text-muted-foreground">
+                  No images uploaded yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-h-[250px] overflow-y-auto p-1 border rounded-md">
+                  {createForm.images.map((imgUrl, idx) => {
+                    const isFeatured = createForm.featured_image === imgUrl;
+                    return (
+                      <div key={idx} className="relative group rounded-md overflow-hidden border bg-muted aspect-video flex flex-col justify-between">
+                        <img src={imgUrl} alt="property" className="absolute inset-0 w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          {!isFeatured && (
+                            <Button
+                              size="sm"
+                              type="button"
+                              variant="secondary"
+                              className="text-[10px] h-6 px-2"
+                              onClick={() => setCreateForm({ ...createForm, featured_image: imgUrl })}
+                            >
+                              Featured
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            type="button"
+                            variant="destructive"
+                            className="h-6 w-6 p-0"
+                            onClick={() => {
+                              const filtered = createForm.images.filter((url) => url !== imgUrl);
+                              setCreateForm({
+                                ...createForm,
+                                images: filtered,
+                                featured_image: isFeatured ? (filtered[0] || "") : createForm.featured_image,
+                              });
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        {isFeatured && (
+                          <span className="absolute top-1 left-1 bg-yellow-500 text-black text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
+                            Featured
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <div className="border-t pt-4 space-y-4">
               <h3 className="font-semibold text-sm text-zinc-700">SEO & Metadata Configuration</h3>
               
@@ -1450,6 +1673,228 @@ function PropertiesListing() {
               </Button>
               <Button onClick={handleCreateSubmit} disabled={isCreatingProperty}>
                 {isCreatingProperty ? "Creating..." : "Save Property"}
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Property Dialog ────────────────────────────────────────────── */}
+      <Dialog open={editPropertyOpen} onOpenChange={setEditPropertyOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Property Details</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 my-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Property Name <span className="text-red-500">*</span></Label>
+                <Input
+                  placeholder="e.g. Miami Beach Luxury Penthouse"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Property Type</Label>
+                <Select
+                  value={editForm.property_type}
+                  onValueChange={(val) => setEditForm({ ...editForm, property_type: val })}
+                >
+                  <SelectTrigger className="capitalize">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["apartment", "house", "villa", "cabin", "condo", "hotel", "resort", "other"].map((t) => (
+                      <SelectItem key={t} value={t} className="capitalize">
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Write detailed property description..."
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 border-t pt-4">
+              <div className="space-y-1.5">
+                <Label>Country</Label>
+                <Input
+                  placeholder="e.g. United States"
+                  value={editForm.country}
+                  onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>State/Province</Label>
+                <Input
+                  placeholder="e.g. Florida"
+                  value={editForm.state}
+                  onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>City</Label>
+                <Input
+                  placeholder="e.g. Miami"
+                  value={editForm.city}
+                  onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Address Details</Label>
+              <Input
+                placeholder="e.g. 123 Ocean Drive"
+                value={editForm.address}
+                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 border-t pt-4">
+              <div className="space-y-1.5">
+                <Label>Starting Price (Per Night)</Label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 299.00"
+                  value={editForm.price_from}
+                  onChange={(e) => setEditForm({ ...editForm, price_from: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Currency</Label>
+                <Input
+                  placeholder="USD"
+                  value={editForm.price_currency}
+                  onChange={(e) => setEditForm({ ...editForm, price_currency: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 border-t pt-4">
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <Label>Is Active</Label>
+                  <p className="text-xs text-muted-foreground">Make listing visible for search</p>
+                </div>
+                <Switch
+                  checked={editForm.is_active}
+                  onCheckedChange={(val) => setEditForm({ ...editForm, is_active: val })}
+                />
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-0.5">
+                  <Label>Is Featured</Label>
+                  <p className="text-xs text-muted-foreground">Highlight on homepage recommendation lists</p>
+                </div>
+                <Switch
+                  checked={editForm.is_featured}
+                  onCheckedChange={(val) => setEditForm({ ...editForm, is_featured: val })}
+                />
+              </div>
+            </div>
+
+            {/* ─── Images Section ────────────────────────────────────────────── */}
+            <div className="border-t pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-sm text-zinc-700">Property Gallery</h3>
+                  <p className="text-xs text-muted-foreground">Upload property photos. Select one as featured thumbnail.</p>
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    id="edit-property-images-file"
+                    onChange={(e) => handleImageUpload(e, "edit")}
+                    disabled={isUploadingImage}
+                  />
+                  <Label
+                    htmlFor="edit-property-images-file"
+                    className={`inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-input hover:bg-accent hover:text-accent-foreground h-9 px-3 cursor-pointer ${isUploadingImage ? "opacity-50 cursor-not-allowed" : ""}`}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {isUploadingImage ? "Uploading..." : "Upload Images"}
+                  </Label>
+                </div>
+              </div>
+
+              {editForm.images.length === 0 ? (
+                <div className="text-center py-6 border border-dashed rounded-lg text-sm text-muted-foreground">
+                  No images uploaded yet.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-h-[250px] overflow-y-auto p-1 border rounded-md">
+                  {editForm.images.map((imgUrl, idx) => {
+                    const isFeatured = editForm.featured_image === imgUrl;
+                    return (
+                      <div key={idx} className="relative group rounded-md overflow-hidden border bg-muted aspect-video flex flex-col justify-between">
+                        <img src={imgUrl} alt="property" className="absolute inset-0 w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          {!isFeatured && (
+                            <Button
+                              size="sm"
+                              type="button"
+                              variant="secondary"
+                              className="text-[10px] h-6 px-2"
+                              onClick={() => setEditForm({ ...editForm, featured_image: imgUrl })}
+                            >
+                              Featured
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            type="button"
+                            variant="destructive"
+                            className="h-6 w-6 p-0"
+                            onClick={() => {
+                              const filtered = editForm.images.filter((url) => url !== imgUrl);
+                              setEditForm({
+                                ...editForm,
+                                images: filtered,
+                                featured_image: isFeatured ? (filtered[0] || "") : editForm.featured_image,
+                              });
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                        {isFeatured && (
+                          <span className="absolute top-1 left-1 bg-yellow-500 text-black text-[9px] font-bold px-1.5 py-0.5 rounded shadow">
+                            Featured
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="border-t pt-4">
+              <Button variant="outline" onClick={() => setEditPropertyOpen(false)} disabled={isUpdatingProperty}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditSubmit} disabled={isUpdatingProperty}>
+                {isUpdatingProperty ? "Saving..." : "Save Changes"}
               </Button>
             </DialogFooter>
           </div>
