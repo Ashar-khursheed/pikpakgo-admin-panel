@@ -661,6 +661,70 @@ function PropertiesListing() {
     setDeleteFeesModalOpen(true);
   };
 
+  // ─── Create Property state ─────────────────────────────────────────────────
+  const [createPropertyOpen, setCreatePropertyOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: "",
+    provider: "direct",
+    provider_property_id: "",
+    property_type: "apartment",
+    country: "",
+    state: "",
+    city: "",
+    address: "",
+    price_from: "",
+    price_currency: "USD",
+    meta_title: "",
+    meta_description: "",
+    seo_slug: "",
+    is_active: true,
+  });
+
+  const { mutate: createProperty, isPending: isCreatingProperty } = useMutation({
+    mutationFn: (payload: typeof createForm & { price_from: number }) =>
+      makeApiRequest(apiUrl.getAllPropertiesListing, {
+        method: "POST",
+        data: payload,
+      }),
+    onSuccess: () => {
+      toast.success("Property created successfully!");
+      setCreatePropertyOpen(false);
+      setCreateForm({
+        name: "",
+        provider: "direct",
+        provider_property_id: "",
+        property_type: "apartment",
+        country: "",
+        state: "",
+        city: "",
+        address: "",
+        price_from: "",
+        price_currency: "USD",
+        meta_title: "",
+        meta_description: "",
+        seo_slug: "",
+        is_active: true,
+      });
+      queryClient.invalidateQueries({ queryKey: ["properties"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to create property");
+    },
+  });
+
+  const handleCreateSubmit = () => {
+    if (!createForm.name.trim() || !createForm.provider_property_id.trim()) {
+      toast.error("Name and Provider Property ID are required");
+      return;
+    }
+    const priceVal = Number(createForm.price_from);
+    createProperty({
+      ...createForm,
+      price_from: isNaN(priceVal) ? 0 : priceVal,
+    });
+  };
+
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -690,10 +754,16 @@ function PropertiesListing() {
             </Button>
           </div>
           {viewMode === "all" && (
-            <Button variant="outline" onClick={() => syncProperties()} disabled={isSyncing || isFetching}>
-              <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
-              {isSyncing ? "Syncing..." : "Sync Properties"}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => syncProperties()} disabled={isSyncing || isFetching}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${isSyncing ? "animate-spin" : ""}`} />
+                {isSyncing ? "Syncing..." : "Sync Properties"}
+              </Button>
+              <Button onClick={() => setCreatePropertyOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Property
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -1228,6 +1298,161 @@ function PropertiesListing() {
               {isRejecting ? "Rejecting..." : "Reject Property"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Manual Property Creation Dialog ──────────────────────────────────── */}
+      <Dialog open={createPropertyOpen} onOpenChange={setCreatePropertyOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Direct Property Listing</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 my-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Property Name <span className="text-red-500">*</span></Label>
+                <Input
+                  placeholder="e.g. Miami Beach Luxury Penthouse"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Provider Property ID <span className="text-red-500">*</span></Label>
+                <Input
+                  placeholder="e.g. DIR-MIA-001"
+                  value={createForm.provider_property_id}
+                  onChange={(e) => setCreateForm({ ...createForm, provider_property_id: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Property Type</Label>
+                <Select
+                  value={createForm.property_type}
+                  onValueChange={(val) => setCreateForm({ ...createForm, property_type: val })}
+                >
+                  <SelectTrigger className="capitalize">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["apartment", "house", "villa", "cabin", "condo", "hotel", "resort", "other"].map((t) => (
+                      <SelectItem key={t} value={t} className="capitalize">
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Supplier Provider</Label>
+                <Input value={createForm.provider} disabled />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 border-t pt-4">
+              <div className="space-y-1.5">
+                <Label>Country</Label>
+                <Input
+                  placeholder="e.g. United States"
+                  value={createForm.country}
+                  onChange={(e) => setCreateForm({ ...createForm, country: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>State/Province</Label>
+                <Input
+                  placeholder="e.g. Florida"
+                  value={createForm.state}
+                  onChange={(e) => setCreateForm({ ...createForm, state: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>City</Label>
+                <Input
+                  placeholder="e.g. Miami"
+                  value={createForm.city}
+                  onChange={(e) => setCreateForm({ ...createForm, city: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Address Details</Label>
+              <Input
+                placeholder="e.g. 123 Ocean Drive"
+                value={createForm.address}
+                onChange={(e) => setCreateForm({ ...createForm, address: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 border-t pt-4">
+              <div className="space-y-1.5">
+                <Label>Starting Price (Per Night)</Label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 299.00"
+                  value={createForm.price_from}
+                  onChange={(e) => setCreateForm({ ...createForm, price_from: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Currency</Label>
+                <Input
+                  placeholder="USD"
+                  value={createForm.price_currency}
+                  onChange={(e) => setCreateForm({ ...createForm, price_currency: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="border-t pt-4 space-y-4">
+              <h3 className="font-semibold text-sm text-zinc-700">SEO & Metadata Configuration</h3>
+              
+              <div className="space-y-1.5">
+                <Label>SEO Slug (URL friendly)</Label>
+                <Input
+                  placeholder="e.g. miami-beach-luxury-penthouse"
+                  value={createForm.seo_slug}
+                  onChange={(e) => setCreateForm({ ...createForm, seo_slug: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Meta Title</Label>
+                <Input
+                  placeholder="e.g. Book Luxury Beachfront Apartment in Miami"
+                  value={createForm.meta_title}
+                  onChange={(e) => setCreateForm({ ...createForm, meta_title: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Meta Description</Label>
+                <Textarea
+                  placeholder="Book a direct luxury beachfront apartment in Miami with top tier amenities..."
+                  value={createForm.meta_description}
+                  onChange={(e) => setCreateForm({ ...createForm, meta_description: e.target.value })}
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="border-t pt-4">
+              <Button variant="outline" onClick={() => setCreatePropertyOpen(false)} disabled={isCreatingProperty}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateSubmit} disabled={isCreatingProperty}>
+                {isCreatingProperty ? "Creating..." : "Save Property"}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

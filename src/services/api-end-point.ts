@@ -56,4 +56,10 @@ export const apiUrl = {
   updateRole: "admin/roles",
   deleteRole: "admin/roles",
   assignRolePermissions: "admin/roles",
+  getPriceMatchClaims: "admin/price-match/claims",
+  verifyPriceMatchClaim: "admin/price-match/claims",
+  getAllBookings: "admin/bookings",
+  getBookingById: "admin/bookings",
+  updateBookingStatus: "admin/bookings",
+  refundBooking: "admin/bookings",
 };

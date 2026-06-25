@@ -33,6 +33,7 @@ import EditPricingMarkup from "./pages/pricing-markup/edit-pricing-markup";
 import ViewPricingMarkup from "./pages/pricing-markup/view-pricing-markup";
 import PropertiesListing from "./pages/properties";
 import PropertyDetail from "./pages/properties/get-property-by-id";
+import PriceMatchClaims from "./pages/claims/PriceMatchClaims";
 import SeoManagementListing from "./pages/seo-management";
 import AddSeo from "./pages/seo-management/add-seo";
 import EditSeo from "./pages/seo-management/edit-seo";
@@ -106,6 +107,7 @@ const AppInner = () => {
                 <Route path="/settings/profile/edit" element={<EditProfile />} />
                 <Route path="/get-all-properties-listing" element={<PropertiesListing />} />
                 <Route path="/get-all-properties-listing/:id" element={<PropertyDetail />} />
+                <Route path="/price-match-claims" element={<PriceMatchClaims />} />
                 <Route path="/get-all-pricing-markup" element={<PricingMarkupListing />} />
                 <Route path="/get-all-pricing-markup/add" element={<AddPricingMarkup />} />
                 <Route path="/get-all-pricing-markup/:id" element={<ViewPricingMarkup />} />

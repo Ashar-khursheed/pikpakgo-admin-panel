@@ -58,6 +58,13 @@ const navigation: NavItem[] = [
     requiredPermission: "view-financials",
   },
   {
+    name: "Price Match Claims",
+    href: "/price-match-claims",
+    icon: ShieldAlert,
+    section: "Overview",
+    requiredPermission: "view-financials",
+  },
+  {
     name: "Users",
     href: "/get-all-users",
     icon: LayoutDashboard,
