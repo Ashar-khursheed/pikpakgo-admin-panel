@@ -59,6 +59,13 @@ const navigation: NavItem[] = [
     requiredPermission: "manage-properties",
   },
   {
+    name: "Bookings",
+    href: "/orders",
+    icon: FileText,
+    section: "Overview",
+    requiredPermission: "manage-properties",
+  },
+  {
     name: "Pricing Markup",
     href: "/get-all-pricing-markup",
     icon: LayoutDashboard,
