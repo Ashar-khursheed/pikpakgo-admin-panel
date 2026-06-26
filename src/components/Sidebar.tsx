@@ -13,7 +13,8 @@ import {
   Search,
   Settings,
   Shield,
-  ShieldAlert
+  ShieldAlert,
+  Briefcase
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
@@ -47,6 +48,13 @@ const navigation: NavItem[] = [
     name: "Properties",
     href: "/get-all-properties-listing",
     icon: LayoutDashboard,
+    section: "Overview",
+    requiredPermission: "manage-properties",
+  },
+  {
+    name: "Travel Inventory",
+    href: "/products",
+    icon: Briefcase,
     section: "Overview",
     requiredPermission: "manage-properties",
   },

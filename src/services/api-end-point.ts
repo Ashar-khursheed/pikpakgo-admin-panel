@@ -62,4 +62,5 @@ export const apiUrl = {
   getBookingById: "admin/bookings",
   updateBookingStatus: "admin/bookings",
   refundBooking: "admin/bookings",
+  verticals: "admin/verticals",
 };
